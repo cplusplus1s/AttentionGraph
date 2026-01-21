@@ -83,7 +83,7 @@ python main_visualize.py
 
 This project provides a comprehensive visualization pipeline to interpret the learned attention mechanisms from three different perspectives:
 
-### 1. Attention Heatmap (Global View)
+### 1. Attention Heatmap
 The raw attention matrix capturing the correlation intensity between all sensor pairs.
 - **X/Y Axis**: All sensor features.
 - **Color**: Brighter/Darker colors indicate higher attention weights (stronger dependencies).
@@ -98,7 +98,7 @@ A directed graph showing the critical paths between specific sensors.
 
 ![Signal Graph](figures/signal_graph.png)
 
-### 3. Module Topology (Coarse-grained)
+### 3. Module Topology
 A high-level system abstraction based on `sensor_mapping.json`.
 - **Aggregation**: Sensors are grouped into functional modules.
 - **Insight**: Displays the macroscopic interaction logic between different subsystems.

@@ -71,7 +71,7 @@ Train the iTransformer model to capture temporal dependencies and extract attent
 - Mechanism: The model learns to forecast future sensor values. During inference, it exports the Attention Matrix (attention_weights.npy).
 - Output: Saves model checkpoints and attention weights to the results/ folder.
 
-### Graph Construction & Visualization
+### Step 3: Graph Construction & Visualization
 Analyze the learned attention weights and generate topology graphs.
 ```bash
 python main_visualize.py

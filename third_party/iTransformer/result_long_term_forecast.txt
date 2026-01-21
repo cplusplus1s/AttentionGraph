@@ -1,0 +1,6 @@
+sensor_analysis_short_iTransformer_custom_M_ft50_sl48_ll10_pl64_dm8_nh2_el1_dl128_df1_fctimeF_ebTrue_dtExp_projection_0  
+mse:30.246610641479492, mae:0.5327006578445435
+
+sensor_analysis_short_iTransformer_custom_M_ft50_sl48_ll10_pl64_dm8_nh2_el1_dl128_df1_fctimeF_ebTrue_dtExp_projection_0  
+mse:30.246559143066406, mae:0.5326997637748718
+

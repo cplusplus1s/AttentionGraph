@@ -187,11 +187,22 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         test_data, test_loader = self._get_data(flag='test')
         if test:
             print('loading model')
-            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
+            # [MODIFIED] Use args.checkpoints to locate the model file if provided
+            if self.args.checkpoints:
+                load_path = os.path.join(self.args.checkpoints, setting, 'checkpoint.pth')
+            else:
+                load_path = os.path.join('./checkpoints/', setting, 'checkpoint.pth')
+            self.model.load_state_dict(torch.load(load_path))
 
         preds = []
         trues = []
-        folder_path = './test_results/' + setting + '/'
+
+        # [MODIFIED] Use args.checkpoints for visualization folder path
+        if self.args.checkpoints:
+            folder_path = os.path.join(self.args.checkpoints, 'test_results', setting)
+        else:
+            folder_path = './test_results/' + setting + '/'
+
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -257,22 +268,30 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         print('test shape:', preds.shape, trues.shape)
 
         # result save
-        folder_path = './results/' + setting + '/'
+        # [MODIFIED] Use args.checkpoints for final results folder path
+        if self.args.checkpoints:
+            folder_path = os.path.join(self.args.checkpoints, setting)
+        else:
+            folder_path = './results/' + setting + '/'
+
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('mse:{}, mae:{}'.format(mse, mae))
-        f = open("result_long_term_forecast.txt", 'a')
+
+        # [MODIFIED] Save text log into the results folder instead of current directory
+        f = open(os.path.join(folder_path, "result_long_term_forecast.txt"), 'a')
         f.write(setting + "  \n")
         f.write('mse:{}, mae:{}'.format(mse, mae))
         f.write('\n')
         f.write('\n')
         f.close()
 
-        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
-        np.save(folder_path + 'pred.npy', preds)
-        np.save(folder_path + 'true.npy', trues)
+        # [MODIFIED] Use os.path.join for saving numpy files
+        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe]))
+        np.save(os.path.join(folder_path, 'pred.npy'), preds)
+        np.save(os.path.join(folder_path, 'true.npy'), trues)
 
         return
 
@@ -330,15 +349,21 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
 
         # result save
-        folder_path = './results/' + setting + '/'
+        # [MODIFIED] Redircted folder_path
+        if self.args.checkpoints:
+            folder_path = os.path.join(self.args.checkpoints, setting)
+        else:
+            folder_path = './results/' + setting + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        np.save(folder_path + 'real_prediction.npy', preds)
+        # [MODIFIED] Use path.join
+        # Original: Use '+'
+        np.save(os.path.join(folder_path, 'real_prediction.npy'), preds)
 
         # [MODIFIED] Saved attention weights
         if self.args.output_attention:
-            np.save(folder_path + 'attention_weights.npy', np.array(attns_list, dtype=object))
-            print("Attention map saved!")
+            np.save(os.path.join(folder_path, 'attention_weights.npy'), np.array(attns_list, dtype=object))
+            print(f"Attention map saved to: {folder_path}")
 
         return

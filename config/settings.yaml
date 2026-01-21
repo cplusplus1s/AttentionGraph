@@ -1,0 +1,67 @@
+paths:
+  # raw data path
+  raw_data: "./data/raw/WDLReplay_04032017"
+  # processed data save path
+  processed_csv: "./data/processed/wdl_filtered_aligned.csv"
+  # training result path
+  results_dir: "./results/"
+  # third party path
+  third_party_dir: "./third_party"
+
+processing:
+  resample_rate: "200ms"
+  start_date: "2024-01-01"
+  fill_method: "ffill_bfill"
+
+  # Signal channels filter
+  selection:
+    #  True: keep only selected_sensors; False: keep all channels
+    enabled: True
+
+    # Specify the list of sensor names to retain
+    selected_sensors:
+      - "ChamberManometerAdjustedPressure_Value"
+      - "ChamberManometer_RawAI_Value"
+      - "ChamberPressureManometer_AI_Value"
+      - "ChamberTemperatureMonitor_Value"
+      - "CurrentStepNumber_Value"
+      - "ForelineManometerAdjustedPressure_Value"
+      - "ForelinePressureManometer_AI_Value"
+      - "GasInjectionRatioSetpoint_Value"
+      - "Gas_10_Flow_AI_Value"
+      - "Gas_11_Flow_AI_Value"
+      - "Gas_12_Flow_AI_Value"
+      - "Gas_13_Flow_AI_Value"
+      - "Gas_15_Flow_AI_Value"
+      - "Gas_1_Flow_AI_Value"
+      - "Gas_2_Flow_AI_Value"
+      - "Gas_5_Flow_AI_Value"
+      - "Gas_6_Flow_AI_Value"
+      - "Gas_8_Flow_AI_Value"
+      - "Gas_9_Flow_AI_Value"
+      - "HeBacksideFlow_AI_Value"
+      - "HeBacksidePressure_AI_Value"
+      - "HePressureSetpoint_AO_Value"
+      - "ProcessManometerAdjustedPressure_Value"
+      - "ProcessManometer_AI_Value"
+      - "ProcessManometer_RawAI_Value"
+      - "ProcessStepNumber_Value"
+      - "TCPWindowHeaterOutputValue_AI_Value"
+      - "TCPWindowHeaterTemperatureMonitor_AI_Value"
+      - "TCRHeaterTemperatureMonitor_AI_Value"
+      - "TCUCh1TempMonitor_AI_Value"
+      - "TCUCh2TempMonitor_AI_Value"
+      - "ThrottleValvePosition_AI_Value"
+      - "ThrottleValveTemperatureMonitor_AI_Value"
+      - "ThrottleValveTemperatureOutputValue_AI_Value"
+      - "TuningBallast_Flow_AI_Value"
+
+    # Specify which column OT should copy
+    target_col: "ChamberManometer_RawAI_Value"
+
+analysis:
+  # Threshold for retaining edges in plots (mean + n * std)
+  # signal graph threshold
+  threshold_std: 2.0
+  # module graph threshold
+  module_threshold_offset: 0.4

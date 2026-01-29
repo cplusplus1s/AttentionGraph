@@ -104,3 +104,14 @@ A high-level system abstraction based on `sensor_mapping.json`.
 - **Insight**: Displays the macroscopic interaction logic between different subsystems.
 
 ![Module Graph](figures/module_graph.png)
+
+## ⚙️ Configuration Guide
+
+Key parameters in `config/settings.yaml`:
+
+| Parameter               | Default | Description |
+|------------------------|---------|-------------|
+| `resample_rate`        | `200ms` | The frequency for data resampling during preprocessing. |
+| `threshold_std`        | `2.0`   | **For Signal Graph:** Controls edge filtering stringency. Higher value = fewer, stronger edges (*Mean + 2.0σ*). |
+| `module_threshold_offset` | `0.4` | **For Module Graph:** Controls module connection sensitivity (*Mean + 0.4σ*). |
+| `selection`            | `-`     | Defines which sensor columns to keep and which one is the target (OT). |

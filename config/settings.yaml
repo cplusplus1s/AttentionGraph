@@ -1,6 +1,6 @@
 paths:
   # raw data path
-  raw_data: "./data/raw/WDLReplay_04032017"
+  raw_data: "./data/raw"
   # processed data save path
   processed_csv: "./data/processed/wdl_filtered_aligned.csv"
   # training result path
@@ -31,7 +31,7 @@ processing:
       - "Gas_10_Flow_AI_Value"
       - "Gas_11_Flow_AI_Value"
       - "Gas_12_Flow_AI_Value"
-      - "Gas_13_Flow_AI_Value"
+      #- "Gas_13_Flow_AI_Value"
       - "Gas_15_Flow_AI_Value"
       - "Gas_1_Flow_AI_Value"
       - "Gas_2_Flow_AI_Value"

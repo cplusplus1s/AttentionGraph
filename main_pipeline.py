@@ -1,33 +1,99 @@
 import yaml
 import os
 import sys
+import pandas as pd
+import numpy as np
+
 # Make sure the src can be found
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.etl.wdl_loader import WDLReplayLoader
+from src.etl.wdl_loader import WDLReplayLoader, BaseLoader
 from src.etl.preprocessor import DataPreprocessor
 
+def get_loader(file_extension: str) -> BaseLoader:
+    """
+    The simple factory pattern: the Loader type depends on file extension
+    """
+    ext = file_extension.lower()
+    if ext in ['.wdl', '.log', '.txt']:
+        return WDLReplayLoader()
+    else:
+        print(f"⚠️ Unknown extension '{ext}', using WDLReplayLoader as default.")
+        return WDLReplayLoader()
+
 def main():
-    # 1. Load settings
+    # Load settings
     with open('config/settings.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
 
-    raw_path = config['paths']['raw_data']
+    # Path setup
+    raw_dir = config['paths']['raw_data']
     out_path = config['paths']['processed_csv']
+    GAP_SIZE = 100
 
-    # 2. Check output dir
+    # Check output dir
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
-    # 3. Run ETL
-    loader = WDLReplayLoader()
-    df_raw = loader.load(raw_path)
+    # Get file list
+    file_list = sorted([f for f in os.listdir(raw_dir) if os.path.isfile(os.path.join(raw_dir, f))])
+
+    if not file_list:
+        print(f"❌ No files found in {raw_dir}")
+        return
+
+    print(f"📦 Found {len(file_list)} files. Starting Batch Processing with Zero-Padding...")
 
     processor = DataPreprocessor(config['processing'])
-    df_final = processor.process(df_raw)
+    processed_dfs = []
 
-    # 4. Save
+    # Loop & Process
+    for i, filename in enumerate(file_list):
+        raw_path_file = os.path.join(raw_dir, filename)
+        file_ext = os.path.splitext(filename)[1]
+
+        print(f"   [{i+1}/{len(file_list)}] 🔄 Processing: {filename}")
+
+        try:
+            loader = get_loader(file_ext)
+            df_raw = loader.load(raw_path_file)
+            df_part = processor.process(df_raw)
+
+            # Insert 0-Padding
+            if len(processed_dfs) > 0:
+                print(f"       ➕ Inserting Gap ({GAP_SIZE} rows)...")
+                gap_df = pd.DataFrame(
+                    np.zeros((GAP_SIZE, len(df_part.columns))),
+                    columns=df_part.columns
+                )
+                processed_dfs.append(gap_df)
+
+            processed_dfs.append(df_part)
+
+        except Exception as e:
+            print(f"   ❌ Error processing {filename}: {str(e)}")
+            continue
+
+    if not processed_dfs:
+        print("❌ No data processed.")
+        return
+
+    # Concatenation
+    print("🔗 Concatenating all segments...")
+    df_final = pd.concat(processed_dfs, axis=0, ignore_index=True)
+
+    # Set synthetic timeline
+    freq = config['processing'].get('resample_rate', '200ms')
+    start_date_str = config['processing'].get('start_date', "2024-01-01")
+    start_date = pd.Timestamp(start_date_str)
+
+    print(f"⏳ Re-indexing synthetic time axis (Start: {start_date}, Freq: {freq})...")
+
+    new_dates = pd.date_range(start=start_date, periods=len(df_final), freq=freq)
+    df_final['date'] = new_dates
+
+    # Save
     df_final.to_csv(out_path, index=False)
-    print(f"🎉 Pipeline Finished! Data saved to {out_path}")
+    print(f"🎉 Pipeline Finished! Merged Data Shape: {df_final.shape}")
 
 if __name__ == "__main__":
     main()

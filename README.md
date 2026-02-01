@@ -79,7 +79,7 @@ To generate a comprehensive performance report, run:
 python main_performance.py
 ```
 The script automatically generates a 4-panel dashboard (performance_dashboard.png) in the results directory:
-![Performance Dashboard](figures/performance_dashboard.png.png)
+![Performance Dashboard](figures/performance_dashboard.png)
 *(Result from `main_performance.py`)*
 - Global Regression Fit (Scatter Plot): Compares Predicted vs. Ground Truth values. Ideally, points should align along the red diagonal line ($y=x$).
 - Error Distribution: Shows the histogram of residuals. A narrow, zero-centered bell curve indicates a healthy model with no bias.

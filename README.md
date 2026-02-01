@@ -71,7 +71,42 @@ Train the iTransformer model to capture temporal dependencies and extract attent
 - Mechanism: The model learns to forecast future sensor values. During inference, it exports the Attention Matrix (attention_weights.npy).
 - Output: Saves model checkpoints and attention weights to the results/ folder.
 
-### Step 3: Graph Construction & Visualization
+### Step 3: Performacne Evaluation
+Since the iTransformer performs **Time-Series Forecasting (Regression)** rather than classification, we evaluate the model using **$R^2$ Score**, **MSE**, and **MAE** on the **original physical scale** (inverse-transformed data).
+
+To generate a comprehensive performance report, run:
+```bash
+python main_performance.py
+```
+The script automatically generates a 4-panel dashboard (performance_dashboard.png) in the results directory:
+![Performance Dashboard](figures/performance_dashboard.png.png)
+*(Result from `main_performance.py`)*
+- Global Regression Fit (Scatter Plot): Compares Predicted vs. Ground Truth values. Ideally, points should align along the red diagonal line ($y=x$).
+- Error Distribution: Shows the histogram of residuals. A narrow, zero-centered bell curve indicates a healthy model with no bias.
+- Per-Sensor Predictability ($R^2$ Bar): Displays how well the model understands each sensor.
+  - 🟢 High $R^2$ (> 0.8): Strong physical correlation captured (e.g., Pressure, Flow).
+  - 🔴 Low/Negative $R^2$: Hard-to-predict variables (often constant setpoints, pure noise, or external operator inputs).
+- Forecast Showcase: A random sample visualizing the temporal tracking capability of the model.
+The script prints a ranked list of all sensors to the console, sorted by $R^2$ Score (Ascending).
+Example Output:
+```Plaintext
+================================================================================
+🏆 Model Performance Report
+   Global R²  : 0.8717 (1.0 is perfect)
+   Global MSE : 0.1036 (Original Scale)
+   Global MAE : 0.0694 (Original Scale)
+--------------------------------------------------------------------------------
+Feature Name              | R² Score   | MSE          | MAE
+--------------------------------------------------------------------------------
+Sensor_12                 |   0.3043   |       0.0834 |   0.2188
+Sensor_18                 |   0.4952   |       0.3875 |   0.0891
+Sensor_7                  |   0.6585   |       0.2486 |   0.0712
+Sensor_30                 |   0.7741   |       0.1607 |   0.0595
+Sensor_13                 |   0.7987   |       0.2829 |   0.3013
+================================================================================
+```
+
+### Step 4: Graph Construction & Visualization
 Analyze the learned attention weights and generate topology graphs.
 ```bash
 python main_visualize.py

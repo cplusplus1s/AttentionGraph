@@ -16,3 +16,6 @@ data/raw/
 
 # OS
 .DS_Store
+
+# Repomix
+repomix-output.xml

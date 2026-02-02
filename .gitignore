@@ -19,3 +19,6 @@ data/raw/
 
 # Repomix
 repomix-output.xml
+
+# Results
+results/

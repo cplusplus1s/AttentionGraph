@@ -150,3 +150,25 @@ Key parameters in `config/settings.yaml`:
 | `threshold_std`        | `2.0`   | **For Signal Graph:** Controls edge filtering stringency. Higher value = fewer, stronger edges (*Mean + 2.0σ*). |
 | `module_threshold_offset` | `0.4` | **For Module Graph:** Controls module connection sensitivity (*Mean + 0.4σ*). |
 | `selection`            | `-`     | Defines which sensor columns to keep and which one is the target (OT). |
+
+## 🩺 Fault Diagnosis (To be continued)
+```mermaid
+graph TD
+    A["Execute main_diagnosis.py"] --> B{"Load data"}
+    B -->|"Generate"| C["100 Normal Maps"]
+    B -->|"Generate"| D["1 Test Map"]
+
+    C --> E["Diagnoser fits"]
+    E -->|"Calculate average"| F["Generate Baseline"]
+
+    D --> G["Diagnoser inference"]
+    F --> G
+
+    G --> H{"Calculate difference"}
+    H -->|"Diff > Threshold"| I["Anomaly"]
+    H -->|"Diff < Threshold"| J["Healthy"]
+
+    I --> K["Generate Report and "]
+    K --> L["Add tags and enter them into the fault database."]
+
+```

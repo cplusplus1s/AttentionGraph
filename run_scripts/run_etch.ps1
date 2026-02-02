@@ -52,7 +52,7 @@ python -u run.py `
   --d_ff 128 `
   --batch_size 8 `
   --learning_rate 0.001 `
-  --train_epochs 1 `
+  --train_epochs 10 `
   --output_attention `
   --do_predict `
   --checkpoints "$ResultsDir/"

@@ -15,7 +15,7 @@ AttentionGraph/
 │   └── processed/          # Aligned and resampled CSVs
 ├── results/                # Experiment outputs (Model weights, Logs, Figures)
 ├── run_scripts/            # Execution scripts (PowerShell/Shell)
-│   └── run_etch.ps1        # Script to trigger iTransformer training (Industrial data)
+│   ├── run_etch.ps1        # Script to trigger iTransformer training (Industrial data)
 │   └── run_msd.ps1         # Script to trigger iTransformer training (Matlab MSD data)
 ├── src/                    # Source code
 │   ├── analysis/           # Graph construction & result loading logic

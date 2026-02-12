@@ -1,15 +1,18 @@
+data_loader:
+  type: "matlab"
+
 paths:
   # raw data path
   raw_data: "./data/raw"
   # processed data save path
-  processed_csv: "./data/processed/wdl_filtered_aligned.csv"
+  processed_csv: "./data/processed/matlab_filtered_aligned.csv"
   # training result path
   results_dir: "./results/"
   # third party path
   third_party_dir: "./third_party"
 
 processing:
-  resample_rate: "200ms"
+  resample_rate: "10ms"
   start_date: "2024-01-01"
   fill_method: "ffill_bfill"
 
@@ -20,48 +23,49 @@ processing:
 
     # Specify the list of sensor names to retain
     selected_sensors:
-      - "ChamberManometerAdjustedPressure_Value"
-      - "ChamberManometer_RawAI_Value"
-      - "ChamberPressureManometer_AI_Value"
-      - "ChamberTemperatureMonitor_Value"
-      - "CurrentStepNumber_Value"
-      - "ForelineManometerAdjustedPressure_Value"
-      - "ForelinePressureManometer_AI_Value"
-      - "GasInjectionRatioSetpoint_Value"
-      - "Gas_10_Flow_AI_Value"
-      - "Gas_11_Flow_AI_Value"
-      - "Gas_12_Flow_AI_Value"
-      #- "Gas_13_Flow_AI_Value"
-      - "Gas_15_Flow_AI_Value"
-      - "Gas_1_Flow_AI_Value"
-      - "Gas_2_Flow_AI_Value"
-      - "Gas_5_Flow_AI_Value"
-      - "Gas_6_Flow_AI_Value"
-      - "Gas_8_Flow_AI_Value"
-      - "Gas_9_Flow_AI_Value"
-      - "HeBacksideFlow_AI_Value"
-      - "HeBacksidePressure_AI_Value"
-      - "HePressureSetpoint_AO_Value"
-      - "ProcessManometerAdjustedPressure_Value"
-      - "ProcessManometer_AI_Value"
-      - "ProcessManometer_RawAI_Value"
-      - "ProcessStepNumber_Value"
-      - "TCPWindowHeaterOutputValue_AI_Value"
-      - "TCPWindowHeaterTemperatureMonitor_AI_Value"
-      - "TCRHeaterTemperatureMonitor_AI_Value"
-      - "TCUCh1TempMonitor_AI_Value"
-      - "TCUCh2TempMonitor_AI_Value"
-      - "ThrottleValvePosition_AI_Value"
-      - "ThrottleValveTemperatureMonitor_AI_Value"
-      - "ThrottleValveTemperatureOutputValue_AI_Value"
-      - "TuningBallast_Flow_AI_Value"
+      - "mass_1_pos"
+      - "mass_1_vel"
+      - "mass_1_acc"
+      - "mass_2_pos"
+      - "mass_2_vel"
+      - "mass_2_acc"
+      - "mass_3_pos"
+      - "mass_3_vel"
+      - "mass_3_acc"
+      - "mass_4_pos"
+      - "mass_4_vel"
+      - "mass_4_acc"
+      - "mass_5_pos"
+      - "mass_5_vel"
+      - "mass_5_acc"
+      - "mass_6_pos"
+      - "mass_6_vel"
+      - "mass_6_acc"
+      - "mass_7_pos"
+      - "mass_7_vel"
+      - "mass_7_acc"
+      - "mass_8_pos"
+      - "mass_8_vel"
+      - "mass_8_acc"
+      - "mass_9_pos"
+      - "mass_9_vel"
+      - "mass_9_acc"
+      - "mass_10_pos"
+      - "mass_10_vel"
+      - "mass_10_acc"
+      - "mass_11_pos"
+      - "mass_11_vel"
+      - "mass_11_acc"
+      - "mass_12_pos"
+      - "mass_12_vel"
+      - "mass_12_acc"
 
     # Specify which column OT should copy
-    target_col: "ChamberManometer_RawAI_Value"
+    target_col: "mass_12_pos"
 
 analysis:
   # Threshold for retaining edges in plots (mean + n * std)
   # signal graph threshold
-  threshold_std: 2.0
+  threshold_std: 2.0 # 2.0 for WDL
   # module graph threshold
-  module_threshold_offset: 0.4
+  module_threshold_offset: 1.05 # 0.4 for WDL

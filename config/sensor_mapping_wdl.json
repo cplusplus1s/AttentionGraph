@@ -1,0 +1,18 @@
+{
+  "ChamberManometer": "Chamber\nPressure",
+  "ChamberPressure": "Chamber\nPressure",
+  "ChamberTemperature": "Chamber\nTemperature",
+  "ForelinePressure": "Foreline\nPressure",
+  "ForelineManometer": "Foreline\nPressure",
+  "GasInject": "Gas\nInjector",
+  "Gas_": "MFC\n(Gas Box)",
+  "HeBackside": "Backside\nHelium",
+  "HePressure": "Backside\nHelium",
+  "ProcessMano": "Process\nPressure",
+  "TCP": "TCP\nHeater",
+  "TCR": "TCR\nHeater",
+  "TCU": "TCU\nChiller",
+  "ThrottleValve": "Throttle\nValve",
+  "TuningBallast": "Tuning\nBallast",
+  "Default": "StepCounter"
+}

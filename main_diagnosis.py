@@ -18,35 +18,69 @@ def load_dummy_data():
 
     return features, normal_maps, anomaly_map
 
+def load_real_attention(folder_path, n_sensors):
+    npy_path = os.path.join(folder_path, 'attention_weights.npy')
+    if not os.path.exists(npy_path):
+        raise FileNotFoundError(f"Attention weights files not found: {npy_path}")
+
+    raw_attn = np.load(npy_path, allow_pickle=True)
+
+    # raw_attn [Layers, Samples, Heads, N, N_key]
+    # clean_attn [Samples, N, N_key]
+    avg_attn = np.mean(raw_attn, axis=(0, 2))
+
+    clean_attn = avg_attn[..., :n_sensors, :n_sensors]
+
+    return clean_attn
+
 def main():
     print("🚀 Starting Diagnosis Pipeline...")
 
+    # Refactor!
+    HEALTHY_DIR = "./results/MSD_v1_healthy_iTransformer_custom_M_ft96_sl48_ll96_pl64_dm8_nh2_el1_dl128_df1_fctimeF_ebTrue_dtMSD_Exp_projection_0"
+    UNHEALTHY_DIR = "./results/MSD_v1_unhealthy_iTransformer_custom_M_ft96_sl48_ll96_pl64_dm8_nh2_el1_dl128_df1_fctimeF_ebTrue_dtMSD_Exp_projection_0"
+    DATA_PATH = "./data/processed/matlab_filtered_aligned.csv"
+
+    df = pd.read_csv(DATA_PATH, nrows=1)
+    feature_names = [c for c in df.columns if c not in ['date', 'OT']]
+    n_sensors = len(feature_names)
+
+    print("📥 Loading real data...")
+    normal_maps = load_real_attention(HEALTHY_DIR, n_sensors)
+
+    unhealthy_all = load_real_attention(UNHEALTHY_DIR, n_sensors)
+
+    if normal_maps.ndim > 3:
+        normal_maps = normal_maps.reshape(-1, n_sensors, n_sensors)
+        unhealthy_all = unhealthy_all.reshape(-1, n_sensors, n_sensors)
+
+    test_sample_map = np.mean(unhealthy_all, axis=0)
+    print(f"📊 Debug: test_sample_map shape: {test_sample_map.shape}")
+
     config = {
-        'feature_names': [f"Sensor_{i}" for i in range(35)],
-        'drift_threshold': 2.0,
-        'top_k': 3
+        'feature_names': feature_names,
+        'drift_threshold': 0.01,
+        'top_k': 20
     }
 
     # Factory pattern to instantiate diagnosers
     # Execute diagnosers sequentially
     diagnosers = [
         AttentionDriftDiagnoser(config),
-        GraphRCADiagnoser(config) # No implement yet
+        # GraphRCADiagnoser(config) # No implement yet
     ]
-
-    # Load attention_weights.npy in the integration testing
-    print("📥 Loading training data for baseline...")
-    features, normal_maps, test_sample_map = load_dummy_data()
 
     # Fit
     for diagnoser in diagnosers:
         diagnoser.fit(normal_maps)
 
-    # 5. Inference
+    # Inference
     print("\n🔍 Diagnosing test sample...")
 
     for diagnoser in diagnosers:
         result = diagnoser.diagnose(test_sample_map)
+
+        print(f"DEBUG: Current Drift Score: {result.description}")
 
         print(f"\n--- Report from {diagnoser.__class__.__name__} ---")
         print(str(result))

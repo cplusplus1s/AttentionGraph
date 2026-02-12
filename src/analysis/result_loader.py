@@ -42,9 +42,15 @@ class ResultLoader:
         return clean_attn, self.sensor_names
 
     def _find_latest_folder(self):
-        # Search folders start with sensor_analysis_short*
-        search_pattern = os.path.join(self.results_root, "sensor_analysis_short*")
-        folders = glob.glob(search_pattern)
+        # Search folders start with sensor_analysis_short*, MSD_*, Exp*
+        patterns = ["MSD_*", "sensor_analysis_short*", "Exp*"]
+        folders = []
+        for p in patterns:
+            folders.extend(glob.glob(os.path.join(self.results_root, p)))
+
+        if not folders:
+            # If none of the above methods are found, as a last resort, search all folders.
+            folders = [f for f in glob.glob(os.path.join(self.results_root, "*")) if os.path.isdir(f)]
         if not folders:
             raise FileNotFoundError("No result folders found in results directory.")
         return max(folders, key=os.path.getmtime)

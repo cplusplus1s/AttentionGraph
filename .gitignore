@@ -8,6 +8,7 @@ env/
 
 # Data
 data/raw/
+data/backup/
 *.csv
 *.h5
 

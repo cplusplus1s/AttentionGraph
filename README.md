@@ -15,13 +15,17 @@ AttentionGraph/
 │   └── processed/          # Aligned and resampled CSVs
 ├── results/                # Experiment outputs (Model weights, Logs, Figures)
 ├── run_scripts/            # Execution scripts (PowerShell/Shell)
-│   └── run_etch.ps1        # Script to trigger iTransformer training
+│   └── run_etch.ps1        # Script to trigger iTransformer training (Industrial data)
+│   └── run_msd.ps1         # Script to trigger iTransformer training (Matlab MSD data)
 ├── src/                    # Source code
 │   ├── analysis/           # Graph construction & result loading logic
+│   ├── diagnosis/          # Fault diagnosis
 │   ├── etl/                # Data preprocessing (ETL) logic
 │   └── visualization/      # Plotting utilities
 ├── third_party/            # External submodules
 │   └── iTransformer/       # Modified iTransformer source code
+├── main_diagnosis.py       # Entry point for Fault Diagnosis
+├── main_performance.py     # Entry point for Performance Evaluation
 ├── main_pipeline.py        # Entry point for Data Preprocessing
 ├── main_visualize.py       # Entry point for Graph Visualization
 └── requirements.txt        # Python dependencies
@@ -113,6 +117,13 @@ python main_visualize.py
 ```
 - Logic: Automatically loads the latest experiment results.
 - Output: Saves visualization figures (Heatmap, Signal Graph, Module Graph) to results/<experiment_id>/figures/.
+
+### Step 5: Fault Diagnosis
+Perform fault diagnosis using attention_drift and other methods.
+```bash
+python main_diagnosis.py
+```
+To be continued...
 
 ## 📊 Visualization & Analysis
 

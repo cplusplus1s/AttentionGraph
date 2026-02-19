@@ -1,3 +1,6 @@
+data_loader:
+  type: "wdl"
+
 paths:
   # raw data path
   raw_data: "./data/raw"
@@ -65,3 +68,10 @@ analysis:
   threshold_std: 2.0
   # module graph threshold
   module_threshold_offset: 0.4
+
+# Fault diagnosis configuration
+diagnosis:
+  healthy_result_dir: "./results/<healthy_experiment_folder>"
+  faulty_result_dir:  "./results/<faulty_experiment_folder>"
+  drift_threshold: 0.5
+  top_k: 20

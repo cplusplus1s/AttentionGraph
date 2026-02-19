@@ -1,135 +1,98 @@
 import pandas as pd
-import numpy as np
 
-class DataPreprocessor:
-    def __init__(self, config):
-        """
-        :param config: The full processing config dict.
-        """
-        self.resample_rate = config.get('resample_rate', '200ms')
-        self.start_date = pd.Timestamp(config.get('start_date', "2024-01-01"))
-        self.selection_config = config.get('selection', {}) # signal channels filter
+from .base import BasePreprocessor
+
+
+class WDLPreprocessor(BasePreprocessor):
+    """
+    Preprocessor for WDL Replay data.
+
+    Pipeline:
+        1. Align interleaved (Time_ms, Value) column pairs onto a shared
+           time grid and resample to a uniform frequency.
+        2. Convert the TimedeltaIndex to absolute timestamps.
+        3. Filter to selected sensor columns.
+        4. Drop constant-valued (zero-variance) columns.
+        5. Add the OT target column and reset the index to 'date'.
+    """
 
     def process(self, df_raw: pd.DataFrame) -> pd.DataFrame:
-        print("🔄 Starting preprocessing pipeline (Keeping original column names)...")
+        print("🔄 WDL Preprocessing pipeline...")
 
-        # 1. Time align and resample
         df_aligned = self._align_and_resample(df_raw)
+        df_aligned.index = self.start_date + df_aligned.index   # Timedelta → Timestamp
 
-        # 2. Convert milliseconds to timestamp
-        df_aligned.index = self.start_date + df_aligned.index
-
-        # 3. Columns filter
         df_selected = self._select_columns(df_aligned)
-
-        # 4. Remove constant columns which result in gradient explosion during training
         df_clean = self._drop_constant_columns(df_selected)
-
-        # 5. Add date and OT
         df_final = self._finalize_format(df_clean)
 
-        print(f"✅ Preprocessing done. Final shape: {df_final.shape}")
+        print(f"✅ WDL preprocessing done. Final shape: {df_final.shape}")
         return df_final
 
-    def _select_columns(self, df):
-        """Filter columns based on configuration (Exact match)."""
-        if not self.selection_config.get('enabled', False):
-            return df
-
-        targets = self.selection_config.get('selected_sensors', [])
-        if not targets:
-            print("⚠️ Selection enabled but no sensors specified. Keeping all.")
-            return df
-
-        available_cols = [col for col in targets if col in df.columns]
-        missing_cols = [col for col in targets if col not in df.columns]
-
-        if missing_cols:
-            print(f"⚠️ Warning: The following sensors were not found in raw data: {missing_cols}")
-
-        if not available_cols:
-            print(f"ℹ️ Available columns in data: {df.columns[:10].tolist()}...")
-            raise ValueError("❌ No selected sensors found! Please check settings.yaml match exact raw names.")
-
-        print(f"✂️ Selected {len(available_cols)} features from {len(df.columns)} original features.")
-        return df[available_cols].copy()
-
-    def _align_and_resample(self, df_raw):
+    def _align_and_resample(self, df_raw: pd.DataFrame) -> pd.DataFrame:
         """
-        Timestapm align and resample
+        Merge interleaved (Time_ms, Value) column pairs into a single
+        DataFrame on a uniform time grid.
+
+        Each sensor in a WDL file has its own independent timestamp axis,
+        so we build individual pd.Series with TimedeltaIndex and then
+        outer-join them before resampling.
         """
-        sensor_series_list = []
+        sensor_series = []
         n_sensors = len(df_raw.columns) // 2
 
         for i in range(n_sensors):
-            time_col_idx = 2 * i
-            value_col_idx = 2 * i + 1
+            t_col = pd.to_numeric(df_raw.iloc[:, 2 * i], errors='coerce')
+            v_col = pd.to_numeric(df_raw.iloc[:, 2 * i + 1], errors='coerce')
+            col_name = df_raw.columns[2 * i + 1].strip()
 
-            # Extrac time and vlue column
-            t_col = df_raw.iloc[:, time_col_idx]
-            v_col = df_raw.iloc[:, value_col_idx]
-
-            # Get original column name
-            raw_col_name = df_raw.columns[value_col_idx]
-            clean_name = raw_col_name.strip()
-
-            # Convert into numeric type
-            t_col = pd.to_numeric(t_col, errors='coerce')
-            v_col = pd.to_numeric(v_col, errors='coerce')
-
-            # Remove invalid values
-            valid_idx = t_col.notna() & v_col.notna()
-
-            if not valid_idx.any():
+            valid_mask = t_col.notna() & v_col.notna()
+            if not valid_mask.any():
                 continue
 
             s = pd.Series(
-                v_col[valid_idx].values,
-                index=pd.to_timedelta(t_col[valid_idx], unit='ms')
+                v_col[valid_mask].values,
+                index=pd.to_timedelta(t_col[valid_mask], unit='ms'),
+                name=col_name,
             )
-            s.name = clean_name
-
-            # Deduplication
+            # Deduplicate timestamps (keep mean for any duplicate entries)
             s = s.groupby(s.index).mean()
-            sensor_series_list.append(s)
+            sensor_series.append(s)
 
-        if not sensor_series_list:
-            raise ValueError("Error: No valid sensor data found to align.")
+        if not sensor_series:
+            raise ValueError("No valid sensor data found in WDL file.")
 
-        df_merged = pd.concat(sensor_series_list, axis=1)
-
+        df_merged = pd.concat(sensor_series, axis=1)
         df_resampled = df_merged.resample(self.resample_rate).mean()
+        return df_resampled.ffill().bfill()
 
-        df_resampled = df_resampled.ffill().bfill()
 
-        return df_resampled
+class MatlabPreprocessor(BasePreprocessor):
+    """
+    Preprocessor for MATLAB simulation data.
 
-    def _drop_constant_columns(self, df):
-        # Drop constant value columns
-        std_vals = df.std()
-        cols_to_drop = std_vals[std_vals == 0].index.tolist()
-        if cols_to_drop:
-            print(f"⚠️ Dropping {len(cols_to_drop)} constant columns.")
-            return df.drop(columns=cols_to_drop)
-        return df.copy()
+    Expects a DataFrame with a ``TimedeltaIndex`` as produced by
+    ``MatlabLoader``.  The steps mirror those of ``WDLPreprocessor`` but
+    skip WDL-specific time-alignment because the MATLAB loader already
+    provides aligned, regular-interval data.
 
-    def _finalize_format(self, df):
-        # 1. Get target column
-        target_name = self.selection_config.get('target_col')
+    Pipeline:
+        1. Resample to the configured frequency.
+        2. Convert the TimedeltaIndex to absolute timestamps.
+        3. Filter to selected sensor columns.
+        4. Drop constant-valued (zero-variance) columns.
+        5. Add the OT target column and reset the index to 'date'.
+    """
 
-        # 2. Specify OT column
-        if target_name and target_name in df.columns:
-            print(f"🎯 Setting Target (OT) column from: {target_name}")
-            df['OT'] = df[target_name]
-        else:
-            if target_name:
-                print(f"⚠️ Target column '{target_name}' not found in processed data.")
-            else:
-                print("ℹ️ No target_col specified. Using last column as OT.")
-            last_col = df.columns[-1]
-            df['OT'] = df[last_col]
+    def process(self, df_raw: pd.DataFrame) -> pd.DataFrame:
+        print("🔄 MATLAB Preprocessing pipeline...")
 
-        # 3. Put date into the first column
-        df.reset_index(inplace=True)
-        df.rename(columns={'index': 'date'}, inplace=True)
-        return df
+        df_resampled = df_raw.resample(self.resample_rate).mean().ffill().bfill()
+        df_resampled.index = self.start_date + df_resampled.index  # Timedelta → Timestamp
+
+        df_selected = self._select_columns(df_resampled)
+        df_clean = self._drop_constant_columns(df_selected)
+        df_final = self._finalize_format(df_clean)
+
+        print(f"✅ MATLAB preprocessing done. Final shape: {df_final.shape}")
+        return df_final

@@ -22,12 +22,12 @@ class Visualizer:
             pos = nx.spring_layout(G, k=0.5, seed=42)
 
         d = dict(G.degree(weight='weight'))
-        node_sizes = [d.get(n, 0) * 1000 + 500 for n in G.nodes()]
+        node_sizes = [min(np.sqrt(d.get(n, 0)) * 800 + 500, 3000) for n in G.nodes()]
 
         nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color='lightblue', alpha=0.9)
         nx.draw_networkx_labels(G, pos, font_size=9, font_weight='bold')
 
-        # Aadjust the edge thickness according to the weight
+        # Adjust the edge thickness according to the weight
         weights = [G[u][v]['weight'] for u, v in G.edges()]
         if weights:
             max_w, min_w = max(weights), min(weights)

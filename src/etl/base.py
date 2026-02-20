@@ -94,27 +94,9 @@ class BasePreprocessor(ABC):
 
     def _finalize_format(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Add the 'OT' (output target) column and reset the index so that
-        the timestamp becomes a plain 'date' column — the format expected
+        The timestamp becomes a plain 'date' column — the format expected
         by iTransformer's Dataset_Custom loader.
         """
-        target_col = self.selection_config.get('target_col')
-
-        if target_col and target_col in df.columns:
-            print(f"🎯 OT column copied from: '{target_col}'")
-            df = df.copy()
-            df['OT'] = df[target_col]
-        else:
-            if target_col:
-                print(
-                    f"⚠️  target_col '{target_col}' not found in processed data. "
-                    f"Falling back to last column."
-                )
-            else:
-                print("ℹ️  No 'target_col' specified. Using the last column as OT.")
-            df = df.copy()
-            df['OT'] = df[df.columns[-1]]
-
         df = df.reset_index()
         df = df.rename(columns={'index': 'date'})
         return df

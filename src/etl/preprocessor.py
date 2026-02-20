@@ -88,6 +88,9 @@ class MatlabPreprocessor(BasePreprocessor):
         print("🔄 MATLAB Preprocessing pipeline...")
 
         df_resampled = df_raw.resample(self.resample_rate).mean().ffill().bfill()
+
+        df_resampled = df_resampled.iloc[:5000] # Keep first 5000 for training
+
         df_resampled.index = self.start_date + df_resampled.index  # Timedelta → Timestamp
 
         df_selected = self._select_columns(df_resampled)

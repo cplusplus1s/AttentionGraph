@@ -1,20 +1,12 @@
 """
-main_diagnosis.py — Step 5 of the AttentionGraph pipeline.
+main_diagnosis.py — Enhanced fault diagnosis with path tracing.
 
-Compares attention maps from a 'healthy' experiment run against a 'faulty'
-run to detect anomalies and identify the most affected sensor pairs.
+Compares attention maps from healthy vs. faulty experiments and uses
+both drift detection and path tracing to identify root causes.
 
-Paths to both experiment result folders are read from ``config/settings.yaml``
-under the ``diagnosis`` section so no code changes are needed when switching
-datasets.
+Usage::
 
-Expected settings.yaml structure::
-
-    diagnosis:
-      healthy_result_dir: "./results/<healthy_experiment_id>"
-      faulty_result_dir:  "./results/<faulty_experiment_id>"
-      drift_threshold: 0.01
-      top_k: 20
+    python main_diagnosis.py
 """
 
 import os
@@ -28,10 +20,11 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.analysis.result_loader import load_sensor_names, load_attention_weights
 from src.diagnosis.attention_drift import AttentionDriftDiagnoser
+from src.diagnosis.path_tracing import PathTracingDiagnoser
 
 
 def main() -> None:
-    print("🚀 Starting Diagnosis Pipeline...")
+    print("🚀 Enhanced Fault Diagnosis Pipeline\n")
 
     with open('config/settings.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
@@ -50,7 +43,7 @@ def main() -> None:
     # Load sensor names from the processed CSV header
     feature_names = load_sensor_names(data_path)
     n_sensors = len(feature_names)
-    print(f"📋 Detected {n_sensors} sensor features.")
+    print(f"📋 Detected {n_sensors} sensor features.\n")
 
     # Load per-sample attention maps: [Samples, N, N]
     print("📥 Loading healthy attention maps...")
@@ -67,45 +60,87 @@ def main() -> None:
 
     # Represent the faulty scenario as the mean of its samples
     test_map = np.mean(faulty_maps, axis=0)
-    print(f"📊 Test map shape: {test_map.shape}")
+    print(f"📊 Test map shape: {test_map.shape}\n")
 
-    # Build diagnoser config from YAML
-    diagnoser_config = {
+    # Build diagnoser configs
+    drift_config = {
         'feature_names':   feature_names,
         'drift_threshold': diag_cfg.get('drift_threshold', 0.5),
         'top_k':           diag_cfg.get('top_k', 20),
     }
 
-    # Instantiate and run diagnosers
-    # Additional diagnosers (FingerprintDiagnoser, GraphRCADiagnoser) can be
-    # added to this list once their logic is implemented.
+    path_config = {
+        'feature_names':   feature_names,
+        'path_threshold':  0.05,  # Minimum edge strength to follow
+        'max_depth':       4,     # Maximum hops to trace back
+    }
+
+    # Instantiate diagnosers
     diagnosers = [
-        AttentionDriftDiagnoser(diagnoser_config),
+        AttentionDriftDiagnoser(drift_config),
+        PathTracingDiagnoser(path_config),
     ]
 
-    print("\n🧠 Fitting diagnosers on normal data...")
+    print("🧠 Fitting diagnosers on normal data...\n")
     for diagnoser in diagnosers:
         diagnoser.fit(normal_maps)
 
-    print("\n🔍 Diagnosing test (faulty) sample...")
+    print("🔍 Diagnosing test (faulty) sample...\n")
+
+    # Run diagnosis
+    results = {}
     for diagnoser in diagnosers:
         result = diagnoser.diagnose(test_map)
+        results[diagnoser.__class__.__name__] = result
 
-        print(f"\n{'─' * 60}")
+        print("─" * 70)
         print(f"Report from {diagnoser.__class__.__name__}")
-        print(f"{'─' * 60}")
+        print("─" * 70)
         print(str(result))
 
         if result.is_anomaly:
-            print("⚠️  Detailed Evidence (Top-K changed edges):")
-            for item in result.evidence:
-                direction = "↑" if item['type'] == 'weight_increase' else "↓"
-                print(
-                    f"   {direction} {item['source']} → {item['target']}: "
-                    f"Δ={item['change_magnitude']:.4f} ({item['type']})"
-                )
+            print("\n⚠️  Detailed Evidence:")
+
+            if diagnoser.__class__.__name__ == 'AttentionDriftDiagnoser':
+                # Show top changed edges
+                for item in result.evidence[:10]:  # Top 10
+                    direction = "↑" if item['type'] == 'weight_increase' else "↓"
+                    print(
+                        f"   {direction} {item['source']} → {item['target']}: "
+                        f"Δ={item['change_magnitude']:.4f} ({item['type']})"
+                    )
+
+            elif diagnoser.__class__.__name__ == 'PathTracingDiagnoser':
+                # Show traced propagation paths
+                for item in result.evidence:
+                    path_str = " → ".join(item['path'])
+                    print(f"\n   🔗 Propagation Path:")
+                    print(f"      {path_str}")
+                    print(f"      Root Cause Candidate: {item['root_cause_candidate']}")
+                    print(f"      Path Strengths: {[f'{s:.3f}' for s in item['path_strength']]}")
         else:
             print("✅ System looks healthy according to this metric.")
+
+        print("\n")
+
+    # Save path visualization
+    if 'PathTracingDiagnoser' in results:
+        path_result = results['PathTracingDiagnoser']
+        path_diagnoser = [d for d in diagnosers if isinstance(d, PathTracingDiagnoser)][0]
+
+        output_dir = os.path.join(faulty_dir, "figures")
+        os.makedirs(output_dir, exist_ok=True)
+
+        print("🎨 Generating path visualization...")
+        path_diagnoser.visualize_paths(
+            test_map,
+            path_result,
+            save_path=os.path.join(output_dir, "fault_propagation_paths.png")
+        )
+
+    print("="*70)
+    print("✅ Diagnosis Complete!")
+    print("="*70)
 
 
 if __name__ == "__main__":

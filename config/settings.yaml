@@ -12,7 +12,7 @@ paths:
   third_party_dir: "./third_party"
 
 processing:
-  resample_rate: "10ms"
+  resample_rate: "2ms"
   start_date: "2024-01-01"
   fill_method: "ffill_bfill"
 
@@ -74,7 +74,7 @@ analysis:
 # Set healthy_result_dir / faulty_result_dir to the experiment folders
 # you want to compare (output of iTransformer training runs).
 diagnosis:
-  healthy_result_dir: "./results/MSD_v1_healthy_iTransformer_custom_M_ft96_sl48_ll96_pl64_dm8_nh2_el1_dl128_df1_fctimeF_ebTrue_dtMSD_Exp_projection_0"
-  faulty_result_dir:  "./results/MSD_v1_iTransformer_custom_M_ft96_sl48_ll96_pl64_dm8_nh2_el1_dl128_df1_fctimeF_ebTrue_dtMSD_Exp_projection_0"
+  healthy_result_dir: "./results/MSD_v1_healthy_iTransformer_custom_M_ft384_sl192_ll192_pl128_dm8_nh3_el1_dl128_df1_fctimeF_ebTrue_dtMSD_Exp_projection_0"
+  faulty_result_dir:  "./results/MSD_v1_unhealthy_iTransformer_custom_M_ft384_sl192_ll192_pl128_dm8_nh3_el1_dl128_df1_fctimeF_ebTrue_dtMSD_Exp_projection_0"
   drift_threshold: 0.01
   top_k: 20

@@ -40,21 +40,24 @@ python -u run.py `
   --model iTransformer `
   --data custom `
   --features M `
-  --seq_len 96 `
-  --pred_len 96 `
-  --e_layers 2 `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 192 `
+  --e_layers 3 `
   --enc_in 36 `
   --dec_in 36 `
   --c_out 36 `
   --des 'MSD_Exp' `
-  --d_model 64 `
+  --d_model 128 `
   --d_ff 128 `
   --batch_size 32 `
-  --learning_rate 0.0001 `
-  --train_epochs 10 `
+  --learning_rate 0.0005 `
+  --train_epochs 20 `
   --output_attention `
   --do_predict `
   --target mass_12_pos `
+  --patience 5 `
+  --lradj "type2" `
   --checkpoints "$ResultsDir/"
 
 # 3. Restore original directory

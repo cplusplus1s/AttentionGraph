@@ -55,6 +55,7 @@ python -u run.py `
   --train_epochs 10 `
   --output_attention `
   --do_predict `
+  --target ChamberManometer_RawAI_Value `
   --checkpoints "$ResultsDir/"
 
 # 3. Restore original directory

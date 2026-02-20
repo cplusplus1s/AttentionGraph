@@ -19,7 +19,7 @@ data/backup/
 .DS_Store
 
 # Repomix
-repomix-output.xml
+*repomix*
 
 # Results
 results/

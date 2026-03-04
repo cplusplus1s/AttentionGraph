@@ -19,7 +19,7 @@ import yaml
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.analysis.result_loader import load_sensor_names, load_attention_weights
-from src.diagnosis.attention_drift import AttentionDriftDiagnoser
+from src.diagnosis.attention_drift import AttentionDriftDiagnoser, SpectralAttentionDriftDiagnoser
 from src.diagnosis.path_tracing import PathTracingDiagnoser
 
 
@@ -66,7 +66,13 @@ def main() -> None:
     drift_config = {
         'feature_names':   feature_names,
         'drift_threshold': diag_cfg.get('drift_threshold', 0.5),
-        'top_k':           diag_cfg.get('top_k', 20),
+        'top_k':           diag_cfg.get('top_k', 10),
+    }
+
+    spectral_config = {
+        'feature_names': feature_names,
+        'spectral_drift_threshold': diag_cfg.get('spectral_drift_threshold', 0.15),
+        'top_k': diag_cfg.get('top_k', 10),
     }
 
     path_config = {
@@ -78,6 +84,7 @@ def main() -> None:
     # Instantiate diagnosers
     diagnosers = [
         AttentionDriftDiagnoser(drift_config),
+        SpectralAttentionDriftDiagnoser(spectral_config),
         PathTracingDiagnoser(path_config),
     ]
 
@@ -89,6 +96,8 @@ def main() -> None:
 
     # Run diagnosis
     results = {}
+    spectral_suspect_indices = None
+
     for diagnoser in diagnosers:
         result = diagnoser.diagnose(test_map)
         results[diagnoser.__class__.__name__] = result
@@ -108,6 +117,18 @@ def main() -> None:
                     print(
                         f"   {direction} {item['source']} → {item['target']}: "
                         f"Δ={item['change_magnitude']:.4f} ({item['type']})"
+                    )
+
+            elif diagnoser.__class__.__name__ == 'SpectralAttentionDriftDiagnoser':
+                baseline = result.details.get('baseline_gap', 0)
+                current = result.details.get('current_gap', 0)
+                print(f"   📊 Spectral Gap Drift: {abs(current - baseline):.4f} (Baseline: {baseline:.4f} → Current: {current:.4f})")
+                print("   🎯 Root Cause Candidates (based on global TokenRank shift):")
+                for item in result.evidence[:10]:  # Top 10
+                    direction = "↑ Rank increase" if item['type'] == 'rank_increased' else "↓ Rank decrease"
+                    print(
+                        f"      {direction} Sensor [{item['sensor']}]: "
+                        f"Global Importance Change Δ={item['importance_change_magnitude']:.4f}"
                     )
 
             elif diagnoser.__class__.__name__ == 'PathTracingDiagnoser':

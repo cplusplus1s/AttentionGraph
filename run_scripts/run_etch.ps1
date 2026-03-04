@@ -44,9 +44,9 @@ python -u run.py `
   --seq_len 50 `
   --pred_len 10 `
   --e_layers 2 `
-  --enc_in 35 `
-  --dec_in 35 `
-  --c_out 35 `
+  --enc_in 29 `
+  --dec_in 29 `
+  --c_out 29 `
   --des 'Exp' `
   --d_model 64 `
   --d_ff 128 `
@@ -55,7 +55,7 @@ python -u run.py `
   --train_epochs 10 `
   --output_attention `
   --do_predict `
-  --target ChamberManometer_RawAI_Value `
+  --target ProcessManometerAdjustedPressure_Value `
   --checkpoints "$ResultsDir/"
 
 # 3. Restore original directory

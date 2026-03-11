@@ -44,9 +44,9 @@ python -u run.py `
   --label_len 192 `
   --pred_len 192 `
   --e_layers 3 `
-  --enc_in 36 `
-  --dec_in 36 `
-  --c_out 36 `
+  --enc_in 12 `
+  --dec_in 12 `
+  --c_out 12 `
   --des 'MSD_Exp' `
   --d_model 128 `
   --d_ff 128 `
@@ -55,7 +55,7 @@ python -u run.py `
   --train_epochs 20 `
   --output_attention `
   --do_predict `
-  --target mass_12_pos `
+  --target mass_12_acc `
   --patience 5 `
   --lradj "type2" `
   --checkpoints "$ResultsDir/"

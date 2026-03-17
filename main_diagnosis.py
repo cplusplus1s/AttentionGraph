@@ -40,6 +40,15 @@ def main() -> None:
             "'diagnosis.faulty_result_dir' in config/settings.yaml."
         )
 
+    # Batch results
+    if not os.path.exists(data_path):
+        base, ext = os.path.splitext(data_path)
+        data_path_fallback = f"{base}_1{ext}"
+        if os.path.exists(data_path_fallback):
+            data_path = data_path_fallback
+        else:
+            raise FileNotFoundError(f"Neither {config['paths']['processed_csv']} nor {data_path_fallback} exists.")
+
     # Load sensor names from the processed CSV header
     feature_names = load_sensor_names(data_path)
     n_sensors = len(feature_names)
@@ -158,6 +167,56 @@ def main() -> None:
             path_result,
             save_path=os.path.join(output_dir, "fault_propagation_paths.png")
         )
+
+    print("\n" + "═"*70)
+    print("🏆 Diagnoser Performance Evaluation (Z-Score)")
+    print("═"*70)
+
+    for diagnoser in diagnosers:
+        name = diagnoser.__class__.__name__
+
+        # PathTracing to be continued...
+        if name == 'PathTracingDiagnoser':
+            continue
+
+        healthy_scores = []
+
+        # Calculate heathy baseline score
+        for h_map in normal_maps:
+            if name == 'AttentionDriftDiagnoser':
+                # AttentionDrift
+                diff_matrix = np.abs(h_map - diagnoser.baseline_map)
+                score = np.linalg.norm(diff_matrix)
+            elif name == 'SpectralAttentionDriftDiagnoser':
+                # SpectralAttentionDrift
+                curr_rank, curr_gap = diagnoser._get_spectral_features(h_map)
+                gap_drift = np.abs(curr_gap - diagnoser.baseline_spectral_gap)
+                rank_drift = np.sum(np.abs(curr_rank - diagnoser.baseline_token_rank))
+                score = float(gap_drift + rank_drift)
+
+            healthy_scores.append(score)
+
+        mu_h = np.mean(healthy_scores)
+        sigma_h = np.std(healthy_scores)
+
+        # Calculate testset score
+        if name == 'AttentionDriftDiagnoser':
+            faulty_score = np.linalg.norm(np.abs(test_map - diagnoser.baseline_map))
+        elif name == 'SpectralAttentionDriftDiagnoser':
+            curr_rank, curr_gap = diagnoser._get_spectral_features(test_map)
+            gap_drift = np.abs(curr_gap - diagnoser.baseline_spectral_gap)
+            rank_drift = np.sum(np.abs(curr_rank - diagnoser.baseline_token_rank))
+            faulty_score = float(gap_drift + rank_drift)
+
+        # Calculate Z-Score
+        # Add 1e-9 to prevent the denominator from being 0
+        z_score = (faulty_score - mu_h) / (sigma_h + 1e-9)
+
+        print(f"🎯 {name}:")
+        print(f"   • Healthy Mean (μ) : {mu_h:.4f}")
+        print(f"   • Healthy Std (σ)  : {sigma_h:.4f}")
+        print(f"   • Faulty Score (X) : {faulty_score:.4f}")
+        print(f"   ⭐ Z-Score         : {z_score:.2f}\n")
 
     print("="*70)
     print("✅ Diagnosis Complete!")

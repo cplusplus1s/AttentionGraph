@@ -20,6 +20,9 @@ class PathTracingDiagnoser(BaseDiagnoser):
         self.threshold = config.get('path_threshold', 0.05)
         self.max_depth = config.get('max_depth', 5)
 
+        self.top_k_starts = config.get('top_k_starts', 3)  # number of backward start points
+        self.max_bfs_branches = config.get('max_bfs_branches', 3)  # max number of forward branches per level
+
     def fit(self, normal_attention_maps: np.ndarray):
         print(f"🧠 [PathTracer] Learning baseline from {len(normal_attention_maps)} samples...")
         self.baseline_map = np.mean(normal_attention_maps, axis=0)
@@ -35,10 +38,10 @@ class PathTracingDiagnoser(BaseDiagnoser):
 
         # 1. Backward Tracing (start with the victims, trace the root cause)
         if prediction_error is not None:
-            start_sensors = np.argsort(prediction_error)[-3:][::-1]
+            start_sensors = np.argsort(prediction_error)[-self.top_k_starts:][::-1]
         else:
             row_drifts = np.sum(diff_matrix, axis=1)
-            start_sensors = np.argsort(row_drifts)[-3:][::-1]
+            start_sensors = np.argsort(row_drifts)[-self.top_k_starts:][::-1]
 
         for start_idx in start_sensors:
             path_info = self._trace_backward(current_attention_map, start_idx, depth=self.max_depth)
@@ -130,8 +133,8 @@ class PathTracingDiagnoser(BaseDiagnoser):
                 if len(current_path) > 1:
                     paths.append({'nodes': current_path, 'strengths': current_strengths, 'trace_type': 'Forward (Spectral Root)'})
             else:
-                # Choose top-3 impacted neighbors
-                neighbors = sorted(neighbors, key=lambda x: diff_matrix[curr_node, x], reverse=True)[:3]
+                # Choose top-k impacted neighbors
+                neighbors = sorted(neighbors, key=lambda x: diff_matrix[curr_node, x], reverse=True)[:self.max_bfs_branches]
                 for v in neighbors:
                     queue.append((current_path + [v], current_strengths + [float(diff_matrix[curr_node, v])]))
 

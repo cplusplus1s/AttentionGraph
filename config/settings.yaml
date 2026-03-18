@@ -78,4 +78,8 @@ diagnosis:
   faulty_result_dir:  "./results/unhealthy_test/run_1"
   drift_threshold: 0.01
   spectral_drift_threshold: 0.01
-  top_k: 20
+  top_k: 20  # top-k evidences
+  tracing_top_k: 3        # Number of backward start points
+  max_bfs_branches: 3     # BFS max branches per node
+  path_threshold: 0.05    # Minimum edge strength to follow
+  max_depth: 4            # Maximum hops to trace back

@@ -23,6 +23,51 @@ from src.diagnosis.attention_drift import AttentionDriftDiagnoser, SpectralAtten
 from src.diagnosis.path_tracing import PathTracingDiagnoser
 
 
+def _print_report(name: str, result, feature_names=None):
+    """Helper function to print detailed evidence for each diagnoser."""
+    print("─" * 70)
+    print(f"Report from {name}")
+    print("─" * 70)
+    print(str(result))
+
+    if result.is_anomaly:
+        print("\n⚠️  Detailed Evidence:")
+
+        if name == 'AttentionDriftDiagnoser':
+            # Show top changed edges
+            for item in result.evidence[:10]:  # Top 10
+                direction = "↑" if item['type'] == 'weight_increase' else "↓"
+                print(
+                    f"   {direction} {item['source']} → {item['target']}: "
+                    f"Δ={item['change_magnitude']:.4f} ({item['type']})"
+                )
+
+        elif name == 'SpectralAttentionDriftDiagnoser':
+            baseline = result.details.get('baseline_gap', 0)
+            current = result.details.get('current_gap', 0)
+            print(f"   📊 Spectral Gap Drift: {abs(current - baseline):.4f} (Baseline: {baseline:.4f} → Current: {current:.4f})")
+            print("   🎯 Root Cause Candidates (based on global TokenRank shift):")
+            for item in result.evidence[:10]:  # Top 10
+                direction = "↑ Rank increase" if item['type'] == 'rank_increased' else "↓ Rank decrease"
+                print(
+                    f"      {direction} Sensor [{item['sensor']}]: "
+                    f"Global Importance Change Δ={item['importance_change_magnitude']:.4f}"
+                )
+
+        elif name == 'PathTracingDiagnoser':
+            # Show traced propagation paths
+            for item in result.evidence:
+                path_str = " → ".join(item['path'])
+                print(f"\n   🔗 [{item.get('trace_type', 'Path')}]")
+                print(f"      Path: {path_str}")
+                print(f"      Root Cause Candidate: {item['root_cause_candidate']}")
+                print(f"      Path Strengths: {[f'{s:.3f}' for s in item['path_strength']]}")
+    else:
+        print("✅ System looks healthy according to this metric.")
+
+    print("\n")
+
+
 def main() -> None:
     print("🚀 Enhanced Fault Diagnosis Pipeline\n")
 
@@ -86,8 +131,10 @@ def main() -> None:
 
     path_config = {
         'feature_names':   feature_names,
-        'path_threshold':  0.05,  # Minimum edge strength to follow
-        'max_depth':       4,     # Maximum hops to trace back
+        'path_threshold':  diag_cfg.get('path_threshold', 0.05),  # Minimum edge strength to follow
+        'max_depth':       diag_cfg.get('max_depth', 4),     # Maximum hops to trace back
+        'top_k_starts':     diag_cfg.get('tracing_top_k', 3),  # Number of backward start points
+        'max_bfs_branches': diag_cfg.get('max_bfs_branches', 3)  # BFS max branches per node
     }
 
     # Instantiate diagnosers
@@ -101,71 +148,48 @@ def main() -> None:
     for diagnoser in diagnosers:
         diagnoser.fit(normal_maps)
 
-    print("🔍 Diagnosing test (faulty) sample...\n")
+    print("\n🔍 Diagnosing test (faulty) sample...\n")
 
-    # Run diagnosis
     results = {}
-    spectral_suspect_indices = None
 
-    for diagnoser in diagnosers:
-        result = diagnoser.diagnose(test_map)
-        results[diagnoser.__class__.__name__] = result
+    # 1. Run AttentionDriftDiagnoser
+    res_drift = diagnosers[0].diagnose(test_map)
+    results['AttentionDriftDiagnoser'] = res_drift
+    _print_report(diagnosers[0].__class__.__name__, res_drift, feature_names)
 
-        print("─" * 70)
-        print(f"Report from {diagnoser.__class__.__name__}")
-        print("─" * 70)
-        print(str(result))
+    # 2. Run SpectralAttentionDriftDiagnoser
+    res_spectral = diagnosers[1].diagnose(test_map)
+    results['SpectralAttentionDriftDiagnoser'] = res_spectral
+    _print_report(diagnosers[1].__class__.__name__, res_spectral, feature_names)
 
-        if result.is_anomaly:
-            print("\n⚠️  Detailed Evidence:")
+    # 3. Extract Top-K Root Causes to PathTracer
+    root_candidate_indices = []
+    if res_spectral.is_anomaly:
+        top_k_roots = diag_cfg.get('tracing_top_k', 3)
+        for item in res_spectral.evidence[:top_k_roots]:
+            sensor_name = item['sensor']
+            if sensor_name in feature_names:
+                root_candidate_indices.append(feature_names.index(sensor_name))
+        print(f"🔗 [PathTracer] Intercepted Top-{top_k_roots} Root Causes from Spectral: {[feature_names[i] for i in root_candidate_indices]}")
 
-            if diagnoser.__class__.__name__ == 'AttentionDriftDiagnoser':
-                # Show top changed edges
-                for item in result.evidence[:10]:  # Top 10
-                    direction = "↑" if item['type'] == 'weight_increase' else "↓"
-                    print(
-                        f"   {direction} {item['source']} → {item['target']}: "
-                        f"Δ={item['change_magnitude']:.4f} ({item['type']})"
-                    )
+    # 4. Run PathTracingDiagnoser (backward vs forward)
+    res_path = diagnosers[2].diagnose(test_map, root_candidates=root_candidate_indices)
+    results['PathTracingDiagnoser'] = res_path
+    _print_report(diagnosers[2].__class__.__name__, res_path, feature_names)
 
-            elif diagnoser.__class__.__name__ == 'SpectralAttentionDriftDiagnoser':
-                baseline = result.details.get('baseline_gap', 0)
-                current = result.details.get('current_gap', 0)
-                print(f"   📊 Spectral Gap Drift: {abs(current - baseline):.4f} (Baseline: {baseline:.4f} → Current: {current:.4f})")
-                print("   🎯 Root Cause Candidates (based on global TokenRank shift):")
-                for item in result.evidence[:10]:  # Top 10
-                    direction = "↑ Rank increase" if item['type'] == 'rank_increased' else "↓ Rank decrease"
-                    print(
-                        f"      {direction} Sensor [{item['sensor']}]: "
-                        f"Global Importance Change Δ={item['importance_change_magnitude']:.4f}"
-                    )
-
-            elif diagnoser.__class__.__name__ == 'PathTracingDiagnoser':
-                # Show traced propagation paths
-                for item in result.evidence:
-                    path_str = " → ".join(item['path'])
-                    print(f"\n   🔗 Propagation Path:")
-                    print(f"      {path_str}")
-                    print(f"      Root Cause Candidate: {item['root_cause_candidate']}")
-                    print(f"      Path Strengths: {[f'{s:.3f}' for s in item['path_strength']]}")
-        else:
-            print("✅ System looks healthy according to this metric.")
-
-        print("\n")
 
     # Save path visualization
     if 'PathTracingDiagnoser' in results:
         path_result = results['PathTracingDiagnoser']
         path_diagnoser = [d for d in diagnosers if isinstance(d, PathTracingDiagnoser)][0]
 
-        output_dir = os.path.join(faulty_dir, "figures")
+        output_dir = os.path.join(faulty_dir, "figures", "paths")
         os.makedirs(output_dir, exist_ok=True)
 
-        print("🎨 Generating path visualization...")
         path_diagnoser.visualize_paths(
             test_map,
             path_result,
-            save_path=os.path.join(output_dir, "fault_propagation_paths.png")
+            save_dir=output_dir
         )
 
     print("\n" + "═"*70)

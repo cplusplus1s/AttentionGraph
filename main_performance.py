@@ -8,6 +8,7 @@ sensor, prints a ranked report, and saves a 4-panel performance dashboard.
 
 import os
 import sys
+import glob
 
 import numpy as np
 import pandas as pd
@@ -28,23 +29,36 @@ from src.visualization.styles import set_style
 
 def _load_prediction_arrays(folder_path: str):
     """
-    Load pred.npy and true.npy from a result folder.
+    Load pred.npy and true.npy from a result folder or its subdirectories.
+    If multiple exist, it automatically picks the most recently modified one.
 
     :returns: ``(preds, trues)`` — both shaped ``[Samples, Pred_Len, Features]``.
-    :raises FileNotFoundError: If either file is missing.
+    :raises FileNotFoundError: If files are missing.
     """
-    pred_path = os.path.join(folder_path, 'pred.npy')
-    true_path = os.path.join(folder_path, 'true.npy')
+    # Recursively search pred.npy
+    pred_paths = glob.glob(os.path.join(folder_path, '**', 'pred.npy'), recursive=True)
 
-    if not os.path.exists(pred_path) or not os.path.exists(true_path):
-        raise FileNotFoundError(
-            "pred.npy or true.npy not found in the result folder.\n"
-            "Did you run training with '--do_predict'?"
-        )
+    if not pred_paths:
+        single_pred = os.path.join(folder_path, 'pred.npy')
+        if os.path.exists(single_pred):
+            pred_paths = [single_pred]
+        else:
+            raise FileNotFoundError(
+                f"pred.npy not found in {folder_path} or its subdirectories.\n"
+                "Did you run training with '--do_predict'?"
+            )
 
-    preds = np.load(pred_path)
-    trues = np.load(true_path)
+    # Choose the latest one for performance evaluation
+    latest_pred_path = max(pred_paths, key=os.path.getmtime)
+    latest_true_path = os.path.join(os.path.dirname(latest_pred_path), 'true.npy')
 
+    if not os.path.exists(latest_true_path):
+        raise FileNotFoundError(f"true.npy not found next to: {latest_pred_path}")
+
+    preds = np.load(latest_pred_path)
+    trues = np.load(latest_true_path)
+
+    print(f"📂 Evaluating predictions from: {os.path.basename(os.path.dirname(latest_pred_path))}")
     print(f"📊 Prediction shape: {preds.shape}  (Samples, SeqLen, Features)")
     return preds, trues
 
@@ -190,6 +204,15 @@ def main() -> None:
 
     results_root = config['paths']['results_dir']
     data_path = config['paths']['processed_csv']
+
+    # If no matlab_filtered_aligned.csv, try matlab_filtered_aligned_1.csv
+    if not os.path.exists(data_path):
+        base, ext = os.path.splitext(data_path)
+        data_path_fallback = f"{base}_1{ext}"
+        if os.path.exists(data_path_fallback):
+            data_path = data_path_fallback
+        else:
+            raise FileNotFoundError(f"Neither {config['paths']['processed_csv']} nor {data_path_fallback} exists.")
 
     try:
         latest_folder = find_latest_result_folder(results_root)

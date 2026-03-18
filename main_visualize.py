@@ -19,10 +19,20 @@ def main():
     with open('config/sensor_mapping.json', 'r', encoding='utf-8') as f:
         mapping = json.load(f)
 
+    # Batch results
+    data_path = config['paths']['processed_csv']
+    if not os.path.exists(data_path):
+        base, ext = os.path.splitext(data_path)
+        data_path_fallback = f"{base}_1{ext}"
+        if os.path.exists(data_path_fallback):
+            data_path = data_path_fallback
+        else:
+            raise FileNotFoundError(f"Neither {config['paths']['processed_csv']} nor {data_path_fallback} exists.")
+
     # 2. Load data
     loader = ResultLoader(
         results_root=config['paths']['results_dir'],
-        data_path=config['paths']['processed_csv']
+        data_path=data_path
     )
     matrix, sensor_names = loader.load_data()
 

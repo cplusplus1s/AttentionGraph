@@ -74,47 +74,46 @@ def load_sensor_names(data_path: str) -> List[str]:
 
 def load_attention_weights(folder_path: str, n_sensors: int) -> np.ndarray:
     """
-    Load and clean the ``attention_weights.npy`` file from a result folder.
-
-    The raw file saved by the modified iTransformer has object-array dtype
-    (list of per-batch tensors).  This function normalises it to a regular
-    float array and averages over layers and attention heads, returning a
-    per-sample attention matrix.
-
-    Raw shape  : ``[Layers, Samples, Heads, N_query, N_key]`` (stored as
-                 object array).
-    Return shape: ``[Samples, n_sensors, n_sensors]``
-
-    :param folder_path: Directory containing ``attention_weights.npy``.
-    :param n_sensors: Number of sensors to extract (truncates larger models).
-    :raises FileNotFoundError: If the .npy file is not present.
-    :raises ValueError: If the model's feature dimension is smaller than
-                        *n_sensors*.
+    Load and clean attention_weights.npy files.
+    If folder_path contains multiple subdirectories with .npy files,
+    it will load and concatenate all of them to build a robust baseline.
     """
-    npy_path = os.path.join(folder_path, 'attention_weights.npy')
-    if not os.path.exists(npy_path):
-        raise FileNotFoundError(
-            f"attention_weights.npy not found in: {folder_path}\n"
-            f"Did you run training with '--output_attention'?"
-        )
+    # Recursively search all  attention_weights.npy files
+    npy_paths = glob.glob(os.path.join(folder_path, '**', 'attention_weights.npy'), recursive=True)
 
-    raw_attn = np.load(npy_path, allow_pickle=True)
+    if not npy_paths:
+        # if attention_weights.npy already in current file
+        single_path = os.path.join(folder_path, 'attention_weights.npy')
+        if os.path.exists(single_path):
+            npy_paths = [single_path]
+        else:
+            raise FileNotFoundError(
+                f"No attention_weights.npy found in {folder_path} or its subdirectories."
+            )
 
-    # Object arrays are lists of per-batch tensors; concatenate them first.
-    if raw_attn.dtype == object:
-        raw_attn = np.concatenate(list(raw_attn), axis=0)
+    all_samples = []
 
-    # Average over layers (axis 0) and heads (axis 2) → [Samples, N, N]
-    avg_attn = np.mean(raw_attn, axis=(0, 2))
+    for npy_path in npy_paths:
+        raw_attn = np.load(npy_path, allow_pickle=True)
 
-    model_features = avg_attn.shape[-1]
+        if raw_attn.dtype == object:
+            raw_attn = np.concatenate(list(raw_attn), axis=0)
+
+        # Average over layers (axis 0) and heads (axis 2) -> [Samples, N, N]
+        avg_attn = np.mean(raw_attn, axis=(0, 2))
+        all_samples.append(avg_attn)
+
+    # Concatenate along the 0th dimension
+    combined_attn = np.concatenate(all_samples, axis=0)
+
+    model_features = combined_attn.shape[-1]
     if model_features < n_sensors:
         raise ValueError(
             f"Dimension mismatch: model attention has {model_features} features "
             f"but the processed CSV has {n_sensors} sensors."
         )
 
-    return avg_attn[..., :n_sensors, :n_sensors].astype(float)
+    return combined_attn[..., :n_sensors, :n_sensors].astype(float)
 
 
 # ---------------------------------------------------------------------------

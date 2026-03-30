@@ -1,55 +1,31 @@
 """
 ETL (Extract-Transform-Load) package for the AttentionGraph project.
-
-Public API
-----------
-- ``BaseLoader``           : Abstract base for all raw-data loaders.
-- ``BasePreprocessor``     : Abstract base for all preprocessors (shared helpers included).
-- ``MatlabLoader``         : Loads MATLAB mass-spring-damper simulation data.
-- ``WDLReplayLoader``      : Loads WDL Replay export files.
-- ``MatlabPreprocessor``   : Preprocesses MATLAB loader output.
-- ``WDLPreprocessor``      : Preprocesses WDL loader output.
-- ``create_etl_pipeline``  : Factory that returns the (loader, preprocessor) pair
-                             appropriate for the configured data source type.
 """
-
 from .base import BaseLoader, BasePreprocessor
-from .matlab_loader import MatlabLoader
+from .matlab_loader import MatlabLoader, Matlab2DLoader
 from .wdl_loader import WDLReplayLoader
-from .preprocessor import MatlabPreprocessor, WDLPreprocessor
+from .preprocessor import MatlabPreprocessor, WDLPreprocessor, Matlab2DPreprocessor
 
 __all__ = [
     "BaseLoader",
     "BasePreprocessor",
     "MatlabLoader",
+    "Matlab2DLoader",
     "WDLReplayLoader",
     "MatlabPreprocessor",
     "WDLPreprocessor",
+    "Matlab2DPreprocessor",
     "create_etl_pipeline",
 ]
 
 # Registry maps the config 'type' string to (LoaderClass, PreprocessorClass)
 _REGISTRY: dict = {
     "matlab": (MatlabLoader, MatlabPreprocessor),
-    "wdl":    (WDLReplayLoader, WDLPreprocessor),
+    "matlab2d": (Matlab2DLoader, Matlab2DPreprocessor),
+    "wdl": (WDLReplayLoader, WDLPreprocessor),
 }
 
-
 def create_etl_pipeline(config: dict) -> tuple[BaseLoader, BasePreprocessor]:
-    """
-    Factory function that reads ``config['data_loader']['type']`` and
-    returns the matching ``(loader, preprocessor)`` pair.
-
-    :param config: The full parsed settings.yaml dictionary.
-    :returns: A ``(loader, preprocessor)`` tuple ready to use.
-    :raises ValueError: If the configured type is not registered.
-
-    Usage::
-
-        loader, preprocessor = create_etl_pipeline(config)
-        df_raw  = loader.load(raw_path)
-        df_clean = preprocessor.process(df_raw)
-    """
     loader_type: str = config.get('data_loader', {}).get('type', 'wdl')
     processing_cfg: dict = config.get('processing', {})
 
@@ -67,4 +43,5 @@ def create_etl_pipeline(config: dict) -> tuple[BaseLoader, BasePreprocessor]:
         f"[ETL] Loader      : {LoaderCls.__name__}\n"
         f"[ETL] Preprocessor: {PreprocessorCls.__name__}"
     )
+
     return loader, preprocessor

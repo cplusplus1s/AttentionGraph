@@ -99,3 +99,23 @@ class MatlabPreprocessor(BasePreprocessor):
 
         print(f"✅ MATLAB preprocessing done. Final shape: {df_final.shape}")
         return df_final
+
+
+class Matlab2DPreprocessor(MatlabPreprocessor):
+    """
+    Preprocessor for the new 2D MATLAB simulation data.
+    Accommodates higher sampling rates (500Hz) by increasing the sequence limit.
+    """
+    def process(self, df_raw: pd.DataFrame) -> pd.DataFrame:
+        print("🔄 MATLAB 2D Preprocessing pipeline (24-Feature Mode)...")
+        df_resampled = df_raw.resample(self.resample_rate).mean().ffill().bfill()
+
+        df_resampled = df_resampled.iloc[1000:11000] # Keep 2s~22s
+
+        df_resampled.index = self.start_date + df_resampled.index
+        df_selected = self._select_columns(df_resampled)
+        df_clean = self._drop_constant_columns(df_selected)
+        df_final = self._finalize_format(df_clean)
+
+        print(f"✅ MATLAB 2D preprocessing done. Final shape: {df_final.shape}")
+        return df_final

@@ -22,7 +22,7 @@ from src.etl import create_etl_pipeline
 
 # Number of zero-filled rows inserted between consecutive WDL segments
 # to prevent the model from learning spurious cross-segment patterns.
-_GAP_SIZE = 400
+_GAP_SIZE = 1000 #_GAP_SIZE > seq_len + pred_len
 
 
 def _build_gap_row(columns) -> pd.DataFrame:
@@ -147,7 +147,7 @@ def main() -> None:
 
     loader, preprocessor = create_etl_pipeline(config)
 
-    if loader_type == 'matlab':
+    if loader_type in ['matlab', 'matlab2d']:
         _run_matlab_pipeline(loader, preprocessor, raw_dir, out_path, processing_cfg)
     else:
         _run_wdl_pipeline(loader, preprocessor, raw_dir, out_path, processing_cfg)

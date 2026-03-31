@@ -13,6 +13,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='iTransformer')
 
+    #[修改]
+    parser.add_argument('--use_spatial_pe', action='store_true', help='Use Topology-Aware Graph Laplacian Spatial Positional Encoding')
+
     # basic config
     parser.add_argument('--is_training', type=int, required=True, default=1, help='status')
     parser.add_argument('--model_id', type=str, required=True, default='test', help='model id')

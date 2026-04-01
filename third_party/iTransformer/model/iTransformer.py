@@ -11,7 +11,7 @@ import numpy as np
 # 新增模块：拓扑感知空间位置编码 (Graph Laplacian Spatial PE)
 # =========================================================================
 class TopologySpatialEmbedding(nn.Module):
-    def __init__(self, num_nodes, d_model, alpha=0.1):
+    def __init__(self, num_nodes, d_model, alpha=0.5):
         super().__init__()
 
         # 1. 获取物理系统的健康基线邻接矩阵
@@ -32,22 +32,25 @@ class TopologySpatialEmbedding(nn.Module):
         # 4. 将 N 维的纯物理空间映射到 Transformer 的高维隐空间 d_model
         self.projection = nn.Linear(num_nodes, d_model)
 
+        # 🚨【核心修改 1】：彻底冻结投影层！切断模型重构捷径的退路
+        for param in self.projection.parameters():
+            param.requires_grad = False
+
+        # 🚨【核心修改 2】：将权重从 0.1 暴降至 0.01 甚至更低
         self.alpha = alpha
 
     def _build_healthy_adjacency(self, num_nodes):
         """
-        基于 generalized_2D_msd.m 的真实物理受力拓扑，构建 24x24 的精确邻接矩阵。
+        纯几何空间位置编码 (Geometric PE)。
+        只提供 3x4 网格的理论相邻关系，绝对不包含任何真实的断连(is_broken)信息。
+        让模型像一张白纸一样，仅凭物理距离去初始化注意力。
         """
-        # num_nodes 应为 24 (12 个质量块 * 2 个坐标维度)
         adj = np.zeros((num_nodes, num_nodes))
 
-        # 辅助函数：将 1~12 的 Mass 编号映射为 0~23 的张量特征索引
         def get_idx(mass_id):
             return 2 * (mass_id - 1), 2 * (mass_id - 1) + 1
 
-        # ---------------------------------------------------------
-        # 步骤 1：枚举 3x4 网格中所有理论上存在的弹簧边
-        # ---------------------------------------------------------
+        # 枚举 3x4 理想网格中所有几何上相邻的边
         edges_horizontal = []
         edges_vertical = []
         edges_diagonal = []
@@ -55,59 +58,32 @@ class TopologySpatialEmbedding(nn.Module):
         for i in range(1, 4):     # Row: 1, 2, 3
             for j in range(1, 5): # Col: 1, 2, 3, 4
                 u = (i - 1) * 4 + j
+                if j < 4: edges_horizontal.append((u, u + 1))
+                if i < 3: edges_vertical.append((u, u + 4))
+                if i < 3 and j < 4: edges_diagonal.append((u, u + 5))
+                if i < 3 and j > 1: edges_diagonal.append((u, u + 3))
 
-                if j < 4: edges_horizontal.append((u, u + 1))       # 右侧水平邻居
-                if i < 3: edges_vertical.append((u, u + 4))         # 下方垂直邻居
-                if i < 3 and j < 4: edges_diagonal.append((u, u + 5)) # 右下对角 (\)
-                if i < 3 and j > 1: edges_diagonal.append((u, u + 3)) # 左下对角 (/)
+        # 🚨 移除了所有的 is_broken 判断，强制全连接！
 
-        # ---------------------------------------------------------
-        # 步骤 2：对齐 MATLAB 中被强行切断的弹簧 (continue 逻辑)
-        # ---------------------------------------------------------
-        # 严格提取自 generalized_2D_msd.m (包含物理上根本不相邻的无效限制)
-        broken_pairs = {
-            (1, 2), (2, 3), (5, 6), (8, 9), (11, 12),
-            (7, 8), (10, 11), (4, 8), (6, 8), (7, 11),
-            (8, 12), (1, 6), (3, 8), (2, 5)
-        }
-
-        def is_broken(u, v):
-            return (u, v) in broken_pairs or (v, u) in broken_pairs
-
-        # ---------------------------------------------------------
-        # 步骤 3：力学定向映射 (Force Direction Mapping)
-        # ---------------------------------------------------------
-
-        # 1. 水平弹簧 (仅影响 X 轴)
+        # 1. 水平几何相邻 (X 轴投射)
         for u, v in edges_horizontal:
-            if not is_broken(u, v):
-                idxX_u, _ = get_idx(u)
-                idxX_v, _ = get_idx(v)
-                adj[idxX_u, idxX_v] = 1
-                adj[idxX_v, idxX_u] = 1
+            idxX_u, _ = get_idx(u); idxX_v, _ = get_idx(v)
+            adj[idxX_u, idxX_v] = 1; adj[idxX_v, idxX_u] = 1
 
-        # 2. 垂直弹簧 (仅影响 Y 轴)
+        # 2. 垂直几何相邻 (Y 轴投射)
         for u, v in edges_vertical:
-            if not is_broken(u, v):
-                _, idxY_u = get_idx(u)
-                _, idxY_v = get_idx(v)
-                adj[idxY_u, idxY_v] = 1
-                adj[idxY_v, idxY_u] = 1
+            _, idxY_u = get_idx(u); _, idxY_v = get_idx(v)
+            adj[idxY_u, idxY_v] = 1; adj[idxY_v, idxY_u] = 1
 
-        # 3. 对角线弹簧 (产生 X 和 Y 的多维耦合)
+        # 3. 对角线几何相邻 (多维交叉投射)
         for u, v in edges_diagonal:
-            if not is_broken(u, v):
-                idxX_u, idxY_u = get_idx(u)
-                idxX_v, idxY_v = get_idx(v)
-                # 相互投射力，形成 4x4 的全连通子块
-                adj[idxX_u, idxX_v] = 1; adj[idxX_v, idxX_u] = 1
-                adj[idxY_u, idxY_v] = 1; adj[idxY_v, idxY_u] = 1
-                adj[idxX_u, idxY_v] = 1; adj[idxY_v, idxX_u] = 1
-                adj[idxY_u, idxX_v] = 1; adj[idxX_v, idxY_u] = 1
+            idxX_u, idxY_u = get_idx(u); idxX_v, idxY_v = get_idx(v)
+            adj[idxX_u, idxX_v] = 1; adj[idxX_v, idxX_u] = 1
+            adj[idxY_u, idxY_v] = 1; adj[idxY_v, idxY_u] = 1
+            adj[idxX_u, idxY_v] = 1; adj[idxY_v, idxX_u] = 1
+            adj[idxY_u, idxX_v] = 1; adj[idxX_v, idxY_u] = 1
 
-        # 确保对角线没有自环 (拉普拉斯矩阵的定义要求)
         np.fill_diagonal(adj, 0)
-
         return adj
 
     def forward(self, x):

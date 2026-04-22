@@ -43,17 +43,17 @@ function Move-InferenceResult {
 Write-Host "========================================="
 Write-Host "🧠 Phase 1: Training Master Model..."
 Write-Host "========================================="
-python -u run.py --is_training 1 --root_path "$DataDir/" --data_path combined_healthy_train.csv --model_id MSD_Master --model iTransformer --data custom --features M --seq_len 384 --label_len 192 --pred_len 192 --e_layers 3 --enc_in 24 --dec_in 24 --c_out 24 --des 'MSD_Exp' --d_model 128 --d_ff 128 --batch_size 128 --learning_rate 0.0005 --train_epochs 20 --output_attention --do_predict --target mass_12_acc_y --patience 5 --lradj "type2" --checkpoints "$ResultsDir/checkpoints/"
+#python -u run.py --is_training 1 --root_path "$DataDir/" --data_path combined_healthy_train.csv --model_id MSD_Master --model iTransformer --data custom --features M --seq_len 384 --label_len 192 --pred_len 192 --e_layers 3 --enc_in 24 --dec_in 24 --c_out 24 --des 'MSD_Exp' --d_model 128 --d_ff 128 --batch_size 128 --learning_rate 0.0005 --train_epochs 20 --output_attention --do_predict --target mass_12_acc_y --patience 5 --lradj "type2" --checkpoints "$ResultsDir/checkpoints/"
 
 Write-Host "========================================="
 Write-Host "📊 Phase 2: Inferring 30 healthy baseline..."
 Write-Host "========================================="
-for ($i = 1; $i -le 30; $i++) {
-    Write-Host "   -> Inferring Healthy Baseline $i"
-    python -u run.py --is_training 0 --root_path "$DataDir/" --data_path "matlab_healthy_$i.csv" --model_id MSD_Master --model iTransformer --data custom --features M --seq_len 384 --label_len 192 --pred_len 192 --e_layers 3 --enc_in 24 --dec_in 24 --c_out 24 --des 'MSD_Exp' --d_model 128 --d_ff 128 --batch_size 128 --output_attention --do_predict --target mass_12_acc_y --checkpoints "$ResultsDir/checkpoints/"
+# for ($i = 1; $i -le 30; $i++) {
+#     Write-Host "   -> Inferring Healthy Baseline $i"
+#     python -u run.py --is_training 0 --root_path "$DataDir/" --data_path "matlab_healthy_$i.csv" --model_id MSD_Master --model iTransformer --data custom --features M --seq_len 384 --label_len 192 --pred_len 192 --e_layers 3 --enc_in 24 --dec_in 24 --c_out 24 --des 'MSD_Exp' --d_model 128 --d_ff 128 --batch_size 128 --output_attention --do_predict --target mass_12_acc_y --checkpoints "$ResultsDir/checkpoints/"
 
-    Move-InferenceResult "healthy_baseline\run_$i"
-}
+#     Move-InferenceResult "healthy_baseline\run_$i"
+# }
 
 Write-Host "========================================="
 Write-Host "🚨 Phase 3: Inferring Unhealthy dataset..."

@@ -134,6 +134,78 @@ def _run_wdl_pipeline(
     print(f"🎉 Done. Saved merged data {df_final.shape} → {out_path}")
 
 
+def _run_brian2_pipeline(loader, preprocessor, raw_dir: str, out_path: str, processing_cfg: dict) -> None:
+    """Multi-directory Brian2 pipeline: concatenate with zero-padding for training, save individuals for inference."""
+    print(f"🚀 Brian2 mode — batch processing & merging directory: {raw_dir}")
+
+    out_dir = os.path.abspath("./data/processed")
+    os.makedirs(out_dir, exist_ok=True)
+
+    freq = processing_cfg.get('resample_rate', '1ms')
+    start_str = processing_cfg.get('start_date', '2024-01-01')
+    start = pd.Timestamp(start_str)
+
+    subdirs = [d for d in os.listdir(raw_dir) if os.path.isdir(os.path.join(raw_dir, d))]
+    if not subdirs:
+        print(f"❌ No subdirectories found in {raw_dir}")
+        return
+
+    subdirs_sorted = sorted(subdirs, key=lambda x: int(x.split('_')[-1]) if x.split('_')[-1].isdigit() else 0)
+    segments = []
+
+    for idx, subdir in enumerate(subdirs_sorted):
+        print(f"   [{idx + 1}/{len(subdirs_sorted)}] Loading: {subdir}")
+        current_raw_dir = os.path.join(raw_dir, subdir)
+
+        csv_files = [f for f in os.listdir(current_raw_dir) if f.endswith('.csv')]
+        if not csv_files:
+            continue
+
+        file_path = os.path.join(current_raw_dir, csv_files[0])
+
+        try:
+            df_raw = loader.load(file_path)
+            df_part = preprocessor.process(df_raw)
+
+            # Remove relative time columns to prevent interference.
+            if 'time_sec' in df_part.columns:
+                df_part = df_part.drop(columns=['time_sec'])
+
+            df_part['date'] = pd.date_range(start=start, periods=len(df_part), freq=freq)
+
+            # Move 'date' to 0th culumn
+            cols = ['date'] + [c for c in df_part.columns if c != 'date']
+            df_part = df_part[cols]
+
+            is_healthy = "unhealthy" not in subdir.lower()
+            prefix = "healthy" if is_healthy else "unhealthy"
+            n_suffix = subdir.split('_')[-1]
+
+            indiv_name = f"brian2_{prefix}_{n_suffix}.csv"
+            df_part.to_csv(os.path.join(out_dir, indiv_name), index=False)
+
+            if is_healthy:
+                if segments:
+                    segments.append(_build_gap_row(df_part.columns))
+                segments.append(df_part)
+
+        except Exception as exc:
+            print(f"   ❌ Skipped '{subdir}': {exc}")
+
+    if segments:
+        print("\n🔗 Concatenating all healthy segments with 0-padding gaps for MASTER TRAINING...")
+        df_final = pd.concat(segments, axis=0, ignore_index=True)
+
+        # Regenerate and rearrange the date.
+        df_final['date'] = pd.date_range(start=start, periods=len(df_final), freq=freq)
+        cols = ['date'] + [c for c in df_final.columns if c != 'date']
+        df_final = df_final[cols]
+
+        combined_path = os.path.join(out_dir, "combined_healthy_train.csv")
+        df_final.to_csv(combined_path, index=False)
+        print(f"🎉 Done! Master training dataset saved -> {combined_path}")
+
+
 def main() -> None:
     with open('config/settings.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
@@ -149,6 +221,8 @@ def main() -> None:
 
     if loader_type in ['matlab', 'matlab2d']:
         _run_matlab_pipeline(loader, preprocessor, raw_dir, out_path, processing_cfg)
+    elif loader_type == 'brian2':
+        _run_brian2_pipeline(loader, preprocessor, raw_dir, out_path, processing_cfg)
     else:
         _run_wdl_pipeline(loader, preprocessor, raw_dir, out_path, processing_cfg)
 

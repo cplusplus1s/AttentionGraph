@@ -4,7 +4,8 @@ ETL (Extract-Transform-Load) package for the AttentionGraph project.
 from .base import BaseLoader, BasePreprocessor
 from .matlab_loader import MatlabLoader, Matlab2DLoader
 from .wdl_loader import WDLReplayLoader
-from .preprocessor import MatlabPreprocessor, WDLPreprocessor, Matlab2DPreprocessor
+from .brian2_loader import Brian2Loader
+from .preprocessor import MatlabPreprocessor, WDLPreprocessor, Matlab2DPreprocessor, Brian2Preprocessor
 
 __all__ = [
     "BaseLoader",
@@ -12,9 +13,11 @@ __all__ = [
     "MatlabLoader",
     "Matlab2DLoader",
     "WDLReplayLoader",
+    "Brian2Loader",
     "MatlabPreprocessor",
     "WDLPreprocessor",
     "Matlab2DPreprocessor",
+    "Brian2Preprocessor",
     "create_etl_pipeline",
 ]
 
@@ -23,6 +26,7 @@ _REGISTRY: dict = {
     "matlab": (MatlabLoader, MatlabPreprocessor),
     "matlab2d": (Matlab2DLoader, Matlab2DPreprocessor),
     "wdl": (WDLReplayLoader, WDLPreprocessor),
+    "brian2": (Brian2Loader, Brian2Preprocessor),
 }
 
 def create_etl_pipeline(config: dict) -> tuple[BaseLoader, BasePreprocessor]:

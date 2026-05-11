@@ -119,3 +119,23 @@ class Matlab2DPreprocessor(MatlabPreprocessor):
 
         print(f"✅ MATLAB 2D preprocessing done. Final shape: {df_final.shape}")
         return df_final
+
+
+class Brian2Preprocessor(BasePreprocessor):
+    """
+    Preprocessor for the Brian2 simulation data.
+    """
+    def process(self, df_raw: pd.DataFrame) -> pd.DataFrame:
+        print("🔄 Brian2 Preprocessing pipeline (Standard Clean Mode)...")
+
+        df_resampled = df_raw.resample(self.resample_rate).mean().ffill().bfill()
+
+        df_resampled.index = pd.to_datetime(self.start_date) + df_resampled.index
+
+        df_selected = self._select_columns(df_resampled)
+        df_clean = self._drop_constant_columns(df_selected)
+
+        df_final = self._finalize_format(df_clean)
+
+        print(f"✅ Brian2 preprocessing done. Final shape: {df_final.shape}")
+        return df_final

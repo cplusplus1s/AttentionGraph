@@ -1,185 +1,197 @@
 # AttentionGraph
 
+A structure-aware fault diagnosis framework for complex multivariate systems, using the attention matrices of an iTransformer model as a proxy for the system's functional topology.
+
 ## Overview
-This project aims to perform data analysis and fault diagnosis of engineering systems.
 
-## 📂 Project Structure
+The framework treats each sensor signal as a distinct token (the **variate-as-token** paradigm of iTransformer) and uses the resulting cross-signal attention matrix as a proxy for the system's functional topology. From this attention matrix, three diagnostic stages are constructed:
 
-```text
+1. **Topology Estimation** — Reconstructs the system's functional connectivity by sparsifying the attention matrix and optionally aggregating into a module-level graph.
+
+2. **Fault Detection** — Compares the test attention map against a healthy baseline using two complementary scoring functions: **Frobenius-norm drift** (aggregate per-edge deviation) and **spectral-gap drift** (Markov-chain mixing properties).
+
+3. **Root Cause Analysis** — Identifies candidate root-cause signals using TokenRank topological drift, refines the ranking via expert-in-the-loop preference learning (CoExBO), and traces propagation paths through forward BFS on the attention difference matrix.
+
+The framework is validated on:
+- **Industrial dataset**: telemetry from a semiconductor manufacturing tool (29 active signals, 13 functional modules)
+- **Brian2 SNN simulations**: four spiking neural network topologies (highway, chains, funnel, binary tree) with controlled synaptic-fault injection
+
+## Repository structure
+
+```
 AttentionGraph/
-├── config/                 # Configuration files
-│   ├── settings.yaml       # Global settings (paths, thresholds, preprocessing)
-│   └── sensor_mapping.json # Mapping sensors to system modules (e.g., Gas, RF)
-├── data/
-│   ├── raw/                # Original WDL files
-│   └── processed/          # Aligned and resampled CSVs
-├── results/                # Experiment outputs (Model weights, Logs, Figures)
-├── run_scripts/            # Execution scripts (PowerShell/Shell)
-│   ├── run_etch.ps1        # Script to trigger iTransformer training (Industrial data)
-│   └── run_msd.ps1         # Script to trigger iTransformer training (Matlab MSD data)
-├── src/                    # Source code
-│   ├── analysis/           # Graph construction & result loading logic
-│   ├── diagnosis/          # Fault diagnosis
-│   ├── etl/                # Data preprocessing (ETL) logic
-│   └── visualization/      # Plotting utilities
-├── third_party/            # External submodules
-│   └── iTransformer/       # Modified iTransformer source code
-├── main_diagnosis.py       # Entry point for Fault Diagnosis
-├── main_performance.py     # Entry point for Performance Evaluation
-├── main_pipeline.py        # Entry point for Data Preprocessing
-├── main_visualize.py       # Entry point for Graph Visualization
-└── requirements.txt        # Python dependencies
+├── brian2_simulator/             # Brian2 SNN simulation generators
+│   ├── generate_brian2_sandbox.py        # Core simulator (LIF neurons, topology builder)
+│   ├── generate_brian2_5x5_batch.py      # Batch generator for all topologies
+│   ├── generate_brian2_highway_fault.py  # Fault scenario generator for highway
+│   └── visualize_brian2.py               # Plots simulation outputs
+│
+├── config/                        # YAML configurations and sensor mappings
+│   ├── settings_brian2.yaml             # SNN data processing config
+│   └── sensor_mapping_*.json            # Sensor-to-module mappings
+│
+├── data/                          # Raw and processed data (not versioned)
+│   ├── raw/                              # Original CSV files
+│   └── processed/                        # Resampled, filtered, normalized data
+│
+├── src/                           # Framework source code
+│   ├── etl/                              # Data loading and preprocessing
+│   │   ├── base.py                       # Base preprocessor abstractions
+│   │   ├── brian2_loader.py              # Brian2-specific loader
+│   │   └── preprocessor.py               # Resampling, gap-fill, scaler persistence
+│   │
+│   ├── analysis/                         # Attention matrix extraction and visualization
+│   │   ├── graph_builder.py              # Builds graphs from attention matrices
+│   │   ├── data_exporter.py              # Exports adjacency CSVs
+│   │   ├── embedding_extractor.py        # Extracts model embeddings
+│   │   └── embedding_visualizer.py       # Visualizes embedding clusters
+│   │
+│   ├── diagnosis/                        # Fault detection and root cause analysis
+│   │   ├── base.py                       # Base diagnoser class
+│   │   ├── attention_drift.py            # Frobenius + spectral gap drift
+│   │   ├── path_tracing.py               # Forward BFS propagation tracing
+│   │   ├── coexbo_diagnoser.py           # Expert-in-the-loop preference learning
+│   │   └── root_cause_analysis.py        # Aggregated root cause pipeline
+│   │
+│   └── visualization/                    # Plotting utilities
+│
+├── third_party/iTransformer/      # Patched iTransformer codebase
+│   ├── experiments/
+│   │   └── exp_long_term_forecasting.py  # Training and inference loop
+│   ├── data_provider/
+│   │   └── data_loader.py                # PATCHED: persistent StandardScaler
+│   └── layers/                           # Core model architecture
+│
+├── run_scripts/                   # Pipeline orchestration
+│   └── run_brian2.ps1                    # Train + healthy + faulty inference
+│
+├── results/                       # Outputs (not versioned)
+│   ├── checkpoints/                      # Trained model weights
+│   ├── healthy_baseline/                 # Healthy attention maps
+│   └── unhealthy_test/                   # Faulty attention maps
+│
+├── main_pipeline.py               # ETL entry point (raw → processed CSVs)
+├── main_visualize.py              # Generates attention graphs from .npy files
+├── main_diagnosis.py              # Runs fault detection + root cause analysis
+├── main_performance.py            # Computes forecasting metrics (MSE, MAE)
+└── README.md                      # This file
 ```
 
-## 🛠️ Environment Setup
+## Installation
 
-### Requirements
-- **Python**: 3.10+
-- **CUDA**: 11.8+ (Recommended for GPU acceleration)
+```bash
+git clone https://github.com/cplusplus1s/AttentionGraph.git
+cd AttentionGraph
+conda env create -f environment.yml  # Or use requirements.txt
+conda activate itransformer
+```
 
-### Installation
-The environment configuration is specified in `requirements.txt`.
+Key dependencies:
+- Python 3.10
+- PyTorch (CUDA 11+ recommended)
+- Brian2 (for SNN simulation)
+- pandas, numpy, scikit-learn
+- scipy (for spectral analysis)
+- GPy or BoTorch (for CoExBO Gaussian Process preference learning)
 
-1. **Create a virtual environment (Conda recommended):**
-   ```bash
-   conda create -n attention_graph python=3.10 -y
-   conda activate attention_graph
-   ```
-2. **Install dependencies:**
-   ```bash
-   # Install PyTorch with CUDA support (Adjust version based on your GPU)
-   pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu118](https://download.pytorch.org/whl/cu118)
-   # Install project requirements
-   pip install -r requirements.txt
-   ```
+## Quick start: end-to-end SNN experiment
 
-## 🚀 Usage
+### Step 1 — Generate Brian2 simulation data
 
-Follow these steps to run the complete pipeline from raw data to visualization.
+```bash
+# Generate 20 healthy runs + 20 faulty runs for all 4 topologies
+python brian2_simulator/generate_brian2_5x5_batch.py
 
-### Step 1: Data Preprocessing
-Clean, align, and resample the raw data.
+# Or generate only highway fault data with a specific severed edge
+python brian2_simulator/generate_brian2_highway_fault.py
+```
+
+Output: `data/raw/brian2/{topology}/{healthy,unhealthy}_N/brian2_data.csv`
+
+### Step 2 — Preprocess data
+
 ```bash
 python main_pipeline.py
 ```
-- Configuration: Controlled by config/settings.yaml.
-- Process: Reads raw data, performs time alignment, resamples (e.g., to 200ms), and selects specific sensors.
-- Output: Generates data/processed/custom_aligned.csv.
 
-### Step 2: Model Training
-Train the iTransformer model to capture temporal dependencies and extract attention weights.
-```PowerShell
-.\run_scripts\run_etch.ps1
-```
-- Note: This PowerShell script automatically handles directory switching to third_party/iTransformer.
-- Mechanism: The model learns to forecast future sensor values. During inference, it exports the Attention Matrix (attention_weights.npy).
-- Output: Saves model checkpoints and attention weights to the results/ folder.
+This applies:
+- Uniform frequency resampling
+- Gap filling (forward + back fill)
+- Constant-column removal
+- Multi-run concatenation with gap padding for training
+- StandardScaler fitting and persistence
 
-### Step 3: Performacne Evaluation
-Since the iTransformer performs **Time-Series Forecasting (Regression)** rather than classification, we evaluate the model using **$R^2$ Score**, **MSE**, and **MAE** on the **original physical scale** (inverse-transformed data).
+Output: `data/processed/{combined_healthy_train,brian2_healthy_N,brian2_unhealthy_N}.csv`
 
-To generate a comprehensive performance report, run:
+### Step 3 — Train iTransformer and run inference
+
 ```bash
-python main_performance.py
-```
-The script automatically generates a 4-panel dashboard (performance_dashboard.png) in the results directory:
-![Performance Dashboard](figures/performance_dashboard.png)
-*(Result from `main_performance.py`)*
-- Global Regression Fit (Scatter Plot): Compares Predicted vs. Ground Truth values. Ideally, points should align along the red diagonal line ($y=x$).
-- Error Distribution: Shows the histogram of residuals. A narrow, zero-centered bell curve indicates a healthy model with no bias.
-- Per-Sensor Predictability ($R^2$ Bar): Displays how well the model understands each sensor.
-  - 🟢 High $R^2$ (> 0.8): Strong physical correlation captured (e.g., Pressure, Flow).
-  - 🔴 Low/Negative $R^2$: Hard-to-predict variables (often constant setpoints, pure noise, or external operator inputs).
-- Forecast Showcase: A random sample visualizing the temporal tracking capability of the model.
-The script prints a ranked list of all sensors to the console, sorted by $R^2$ Score (Ascending).
-Example Output:
-```Plaintext
-================================================================================
-🏆 Model Performance Report
-   Global R²  : 0.8717 (1.0 is perfect)
-   Global MSE : 0.1036 (Original Scale)
-   Global MAE : 0.0694 (Original Scale)
---------------------------------------------------------------------------------
-Feature Name              | R² Score   | MSE          | MAE
---------------------------------------------------------------------------------
-Sensor_12                 |   0.3043   |       0.0834 |   0.2188
-Sensor_18                 |   0.4952   |       0.3875 |   0.0891
-Sensor_7                  |   0.6585   |       0.2486 |   0.0712
-Sensor_30                 |   0.7741   |       0.1607 |   0.0595
-Sensor_13                 |   0.7987   |       0.2829 |   0.3013
-================================================================================
+# Windows PowerShell
+.\run_scripts\run_brian2.ps1
 ```
 
-### Step 4: Graph Construction & Visualization
-Analyze the learned attention weights and generate topology graphs.
+This script runs three phases:
+1. **Training**: Trains iTransformer on `combined_healthy_train.csv` (10 epochs, MSE loss)
+2. **Healthy inference**: Runs inference on each `brian2_healthy_N.csv`, extracts attention maps
+3. **Faulty inference**: Runs inference on each `brian2_unhealthy_N.csv`, extracts attention maps
+
+Output: `results/checkpoints/` (model), `results/healthy_baseline/` and `results/unhealthy_test/` (attention maps)
+
+### Step 4 — Generate topology graphs
+
 ```bash
-python main_visualize.py
+python main_visualize.py --target_folder healthy_baseline
+python main_visualize.py --target_folder unhealthy_test
 ```
-- Logic: Automatically loads the latest experiment results.
-- Output: Saves visualization figures (Heatmap, Signal Graph, Module Graph) to results/<experiment_id>/figures/.
 
-### Step 5: Fault Diagnosis
-Perform fault diagnosis using attention_drift and other methods.
+Output: topology graphs (signal-level and module-level) saved alongside the attention maps.
+
+### Step 5 — Run diagnosis
+
 ```bash
 python main_diagnosis.py
 ```
-To be continued...
 
-## 📊 Visualization & Analysis
+This runs the full diagnostic pipeline:
+- Frobenius drift detection
+- Spectral gap drift detection
+- TokenRank-based root cause ranking
+- CoExBO expert-in-the-loop refinement
+- Forward BFS propagation tracing
 
-This project provides a comprehensive visualization pipeline to interpret the learned attention mechanisms from three different perspectives:
+Output: console report of detection rates, z-scores, root cause candidates, and propagation paths.
 
-### 1. Attention Heatmap
-The raw attention matrix capturing the correlation intensity between all sensor pairs.
-- **X/Y Axis**: All sensor features.
-- **Color**: Brighter/Darker colors indicate higher attention weights (stronger dependencies).
+## Key methodology
 
-![Attention Heatmap](figures/attn_heatmap.png)
-*(Result from `main_visualize.py`)*
+### Variate-as-token attention
 
-### 2. Signal Topology
-A directed graph showing the critical paths between specific sensors.
-- **Filtering**: Edges are filtered using the `Mean + n * Std` threshold to remove noise.
-- **Insight**: Reveals specific sensor-to-sensor strong dependencies.
+The iTransformer treats each sensor's full time-series as a token, producing a row-stochastic attention matrix $\hat{\mathbf{A}} \in \mathbb{R}^{N \times N}$. We average attention across all heads and layers to obtain a robust proxy adjacency matrix that captures inter-signal functional dependencies.
 
-![Signal Graph](figures/signal_graph.png)
+### Frobenius drift detection
 
-### 3. Module Topology
-A high-level system abstraction based on `sensor_mapping.json`.
-- **Aggregation**: Sensors are grouped into functional modules.
-- **Insight**: Displays the macroscopic interaction logic between different subsystems.
+For a test attention map $\hat{\mathbf{A}}_\text{test}$ and a healthy baseline $\bar{\mathbf{A}}_\text{healthy}$:
 
-![Module Graph](figures/module_graph.png)
+$$S_\text{frob} = \| \hat{\mathbf{A}}_\text{test} - \bar{\mathbf{A}}_\text{healthy} \|_F$$
 
-## ⚙️ Configuration Guide
+A z-score is computed against the leave-one-out null distribution of healthy runs; detection occurs when $z > z_\alpha$ (typically $z_\alpha = 2$ or $3$).
 
-Key parameters in `config/settings.yaml`:
+### Spectral gap drift detection
 
-| Parameter               | Default | Description |
-|------------------------|---------|-------------|
-| `resample_rate`        | `200ms` | The frequency for data resampling during preprocessing. |
-| `threshold_std`        | `2.0`   | **For Signal Graph:** Controls edge filtering stringency. Higher value = fewer, stronger edges (*Mean + 2.0σ*). |
-| `module_threshold_offset` | `0.4` | **For Module Graph:** Controls module connection sensitivity (*Mean + 0.4σ*). |
-| `selection`            | `-`     | Defines which sensor columns to keep and which one is the target (OT). |
+The spectral gap $g(\hat{\mathbf{A}}) = 1 - |\lambda_2|$ measures the mixing properties of the attention-induced Markov chain. Spectral gap drift is the absolute difference from baseline. This method is included as a theoretical comparison; in our experiments, Frobenius drift is more robust.
 
-## 🩺 Fault Diagnosis (To be continued)
-```mermaid
-graph TD
-    A["Execute main_diagnosis.py"] --> B{"Load data"}
-    B -->|"Generate"| C["100 Normal Maps"]
-    B -->|"Generate"| D["1 Test Map"]
+### TokenRank-based root cause ranking
 
-    C --> E["Diagnoser fits"]
-    E -->|"Calculate average"| F["Generate Baseline"]
+TokenRank $\boldsymbol{\pi}$ is the stationary distribution of the row-normalized attention matrix (analogous to PageRank). Signals with the largest per-signal TokenRank drift are flagged as candidate root causes.
 
-    D --> G["Diagnoser inference"]
-    F --> G
+### Expert-in-the-loop refinement
 
-    G --> H{"Calculate difference"}
-    H -->|"Diff > Threshold"| I["Anomaly"]
-    H -->|"Diff < Threshold"| J["Healthy"]
+Pairwise preferences from a domain expert (real or synthetic) train a Gaussian Process preference classifier. Soft-Copeland aggregation produces a prior score, which is fused with TokenRank drift via a Bayesian conjugate update.
 
-    I --> K["Generate Report and "]
-    K --> L["Add tags and enter them into the fault database."]
+### Forward BFS propagation tracing
 
-```
+The attention difference matrix $\mathbf{D}_{ij} = | \hat{\mathbf{A}}_\text{test}^{ij} - \bar{\mathbf{A}}_\text{healthy}^{ij} |$ is searched via depth-limited breadth-first search, expanding along edges with $D_{ij} > \tau$ to reconstruct downstream propagation paths from the top root cause candidate.
+
+This work builds on:
+
+- **iTransformer**: Liu et al., "iTransformer: Inverted Transformers Are Effective for Time Series Forecasting", ICLR 2024 ([repo](https://github.com/thuml/iTransformer))
+- **Brian2**: Stimberg et al., "Brian 2, an intuitive and efficient neural simulator", eLife 2019

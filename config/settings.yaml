@@ -2,13 +2,13 @@ data_loader:
   type: "brian2"
 
 paths:
-  raw_data: "./data/raw/brian2"
+  raw_data: "./data/raw/brian2/binary_tree"
   processed_csv: "./data/processed/brian2_healthy_1.csv"
   results_dir: "./results/"
   third_party_dir: "./third_party"
 
 processing:
-  resample_rate: "1ms"
+  resample_rate: "10ms"
   start_date: "2024-01-01"
   fill_method: "ffill_bfill"
   selection:
@@ -128,7 +128,7 @@ analysis:
 # you want to compare (output of iTransformer training runs).
 diagnosis:
   healthy_result_dir: "./results/healthy_baseline"
-  faulty_result_dir:  "./results/unhealthy_test/run_1"
+  faulty_result_dir:  "./results/unhealthy_test"
   drift_threshold: 0.01
   spectral_drift_threshold: 0.01
   top_k: 20  # top-k evidences

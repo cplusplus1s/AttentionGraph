@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
 import warnings
+import joblib
 
 warnings.filterwarnings('ignore')
 
@@ -244,8 +245,16 @@ class Dataset_Custom(Dataset):
             df_data = df_raw[[self.target]]
 
         if self.scale:
-            train_data = df_data[border1s[0]:border2s[0]]
-            self.scaler.fit(train_data.values)
+            print("🔥 PATCHED Dataset_Custom.__read_data__ running")
+            scaler_path = os.path.join(self.root_path, 'scaler.pkl')
+            if os.path.exists(scaler_path):
+                print(f"📂 Loading saved scaler from: {scaler_path}")
+                self.scaler = joblib.load(scaler_path)
+            else:
+                train_data = df_data[border1s[0]:border2s[0]]
+                self.scaler.fit(train_data.values)
+                joblib.dump(self.scaler, scaler_path)
+                print(f"💾 Fit and saved scaler to: {scaler_path}")
             data = self.scaler.transform(df_data.values)
         else:
             data = df_data.values
@@ -482,7 +491,14 @@ class Dataset_Pred(Dataset):
             df_data = df_raw[[self.target]]
 
         if self.scale:
-            self.scaler.fit(df_data.values)
+            print("🔥 PATCHED Dataset_Pred.__read_data__ running")
+            scaler_path = os.path.join(self.root_path, 'scaler.pkl')
+            if os.path.exists(scaler_path):
+                print(f"📂 [Dataset_Pred] Loading saved scaler from: {scaler_path}")
+                self.scaler = joblib.load(scaler_path)
+            else:
+                print(f"⚠️  [Dataset_Pred] No saved scaler at {scaler_path}, fitting on this file (won't match training!)")
+                self.scaler.fit(df_data.values)
             data = self.scaler.transform(df_data.values)
         else:
             data = df_data.values
